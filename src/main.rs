@@ -6,7 +6,6 @@ use cranelift_lego::func::{host_fn, Call as _, Func, Results};
 use cranelift_lego::ctx::Ctx;
 use cranelift_lego::arithmetic::Integer;
 
-
 extern "C" fn print_hello<T: Display>(t: T) {
     println!("hello world: {t}");
 }

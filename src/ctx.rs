@@ -30,12 +30,15 @@ pub struct NamedHostFn {
 #[macro_export]
 macro_rules! host_fns {
     ($($name:expr => $as:ty $(,)?)*) => {
-        [
-            $($crate::ctx::NamedHostFn {
-                name: stringify!($name),
-                ptr: ($name as $as).to_fn_ptr(),
-            }),*
-        ]
+        {
+            use $crate::func::HostFn;
+            [
+                $($crate::ctx::NamedHostFn {
+                    name: stringify!($name),
+                    ptr: ($name as $as).to_fn_ptr(),
+                }),*
+            ]
+        }
     };
 }
 
