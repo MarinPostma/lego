@@ -1,6 +1,10 @@
 use std::fmt::Display;
 
-use cranelift_lego::{arithmetic::Integer, ctx::Ctx, func::{host_fn, Call as _, Func, HostFn, Results}, host_fns, types::{ToJitPrimitive, Val}};
+use cranelift_lego::types::{ToJitPrimitive, Val};
+use cranelift_lego::host_fns;
+use cranelift_lego::func::{host_fn, Call as _, Func, Results};
+use cranelift_lego::ctx::Ctx;
+use cranelift_lego::arithmetic::Integer;
 
 
 extern "C" fn print_hello<T: Display>(t: T) {
