@@ -28,6 +28,7 @@ struct Test {
 
 fn main() {
     let mut builder = Ctx::builder();
+    // this is quite ugly, I wish there was a better way to pass host functions
     builder.register_host_functions(host_fns![
         print_hello::<u32> => extern "C" fn(u32),
         print_hello::<u64> => extern "C" fn(u64),

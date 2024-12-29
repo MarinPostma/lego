@@ -203,6 +203,35 @@ where
     }
 }
 
+impl<A, B, C> HostFn for extern "C" fn(A, B) -> C
+where
+    A: Param,
+    B: Param,
+    C: Results,
+{
+    type Input = (A, B);
+    type Output = C;
+
+    fn to_fn_ptr(self) -> *const u8 {
+        self as *const u8
+    }
+}
+
+impl<A, B, C, D> HostFn for extern "C" fn(A, B, C) -> D
+where
+    A: Param,
+    B: Param,
+    C: Param,
+    D: Results,
+{
+    type Input = (A, B, C);
+    type Output = D;
+
+    fn to_fn_ptr(self) -> *const u8 {
+        self as *const u8
+    }
+}
+
 impl HostFn for extern "C" fn()
 {
     type Input = ();
@@ -237,6 +266,18 @@ impl<A, B, C, D> IntoParams<(Var<C>, Var<D>)> for (A, B) where
     fn params(&self, ctx: &mut FnCtx, out: &mut Vec<Value>) {
         self.0.params(ctx, out);
         self.1.params(ctx, out);
+    }
+}
+
+impl<A1, A2, B1, B2, C1, C2> IntoParams<(Var<A1>, Var<B1>, Var<C1>)> for (A2, B2, C2) where 
+    A2: IntoParams<Var<A1>>,
+    B2: IntoParams<Var<B1>>,
+    C2: IntoParams<Var<C1>>,
+{
+    fn params(&self, ctx: &mut FnCtx, out: &mut Vec<Value>) {
+        self.0.params(ctx, out);
+        self.1.params(ctx, out);
+        self.2.params(ctx, out);
     }
 }
 
@@ -358,6 +399,7 @@ impl Results for () {
 
 /// Retrieve a host function. The host fuction must have been registered during context creation.
 pub fn host_fn<F: HostFn>(f: F) ->  Func<F::Input, F::Output> {
+    // todo: memoize?
     with_ctx(|ctx| {
         let p = f.to_fn_ptr() as usize;
         let name = ctx.host_fn_map.get(&p).unwrap();

@@ -1,10 +1,12 @@
+use std::collections::HashMap;
+use std::hash::Hash;
 use std::marker::PhantomData;
 use std::ops::Deref;
 
 use cranelift::prelude::{types::*, InstBuilder as _, MemFlags};
 use cranelift::prelude::*;
 
-use crate::func::{with_ctx, FnCtx};
+use crate::func::{host_fn, with_ctx, FnCtx, IntoParams, Param};
 use crate::types::{IntoVal, Val};
 
 
@@ -72,5 +74,31 @@ impl<T> Proxy<T> {
     #[doc(hidden)]
     pub fn new(addr: Value, offset: i32) -> Self {
         Self { addr, offset, _pth: PhantomData }
+    }
+}
+
+impl<T> IntoParams<&mut T> for Proxy<T> {
+    fn params(&self, _ctx: &mut FnCtx, out: &mut Vec<Value>) {
+        out.push(self.addr());
+    }
+}
+
+impl<K, V> Proxy<HashMap<K, V>>
+{
+    pub fn insert<'a>(&'a mut self, k: impl IntoParams<K>, v: impl IntoParams<V>)
+    where 
+        K: Hash + Eq + Param + 'a,
+        V: Param + 'a,
+    {
+        extern "C" fn insert<'b, K, V>(map: &'b mut HashMap<K, V>, k: K, v: V)
+        where K: Hash + Eq + 'b,
+            V: 'b,
+        {
+            map.insert(k, v);
+        }
+
+        let f = host_fn(insert::<K, V> as extern "C" fn (&'a mut HashMap<K, V>, k: K, v: V));
+
+        f.call((self, k, v));
     }
 }
