@@ -9,15 +9,15 @@ use cranelift_codegen::ir::SigRef;
 use cranelift_module::Module;
 
 use crate::func::{host_fn, with_ctx, FnCtx, IntoParams, Param};
-use crate::types::{IntoVal, Val};
+use crate::types::{IntoVal, ToJitPrimitive, Val};
 
 
-impl Proxy<u64> {
+impl<T: ToJitPrimitive> Proxy<T> {
     fn load(&self, ctx: &mut FnCtx) -> Value {
-        ctx.builder.ins().load(I64, MemFlags::new(), self.addr, self.offset)
+        ctx.builder.ins().load(T::ty(), MemFlags::new(), self.addr, self.offset)
     }
 
-    pub fn get(&self) -> Val<u64> {
+    pub fn get(&self) -> Val<T> {
         with_ctx(|ctx| {
             let value = self.load(ctx);
             Val::new(value)

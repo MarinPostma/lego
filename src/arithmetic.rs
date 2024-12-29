@@ -2,10 +2,11 @@ use std::ops::Add;
 
 use cranelift::prelude::{InstBuilder as _, TrapCode, Value};
 
-use crate::types::{Val, Var};
+use crate::types::{ToJitPrimitive, Val, Var};
 use crate::func::{with_ctx, FnCtx};
+use crate::Proxy;
 
-trait IntAdd {
+trait IntAdd: ToJitPrimitive {
     fn add(ctx: &mut FnCtx, lhs: Value, rhs: Value) -> Value;
 }
 
@@ -57,6 +58,28 @@ impl<T: IntAdd> Add for Var<T> {
             let rhs = ctx.builder.use_var(rhs.variable());
                 
             Val::new(T::add(ctx, lhs, rhs))
+        })
+    }
+}
+
+impl<T: IntAdd> Add for Val<T> {
+    type Output = Val<T>;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        with_ctx(|ctx| -> Val<T> {
+            Val::new(T::add(ctx, self.value(), rhs.value()))
+        })
+    }
+}
+
+impl<T: IntAdd> Add for Proxy<T> {
+    type Output = Val<T>;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        with_ctx(|ctx| -> Val<T> {
+            let lhs = self.get();
+            let rhs = rhs.get();
+            Val::new(T::add(ctx, lhs.value(), rhs.value()))
         })
     }
 }
