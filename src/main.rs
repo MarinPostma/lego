@@ -1,8 +1,9 @@
+use std::collections::HashMap;
 use std::fmt::Display;
 
 use lego::types::{Val, Var};
 use lego::host_fns;
-use lego::func::{host_fn, Call as _, Func, Param, Results};
+use lego::func::{Call as _, Func, Param, Results};
 use lego::ctx::Ctx;
 use lego::arithmetic::Integer;
 use lego_macros::LegoBlock;
@@ -38,24 +39,16 @@ fn main() {
 
     let add = add_any::<u32>("add", &mut ctx);
 
-    let main = ctx.func::<(u32, &mut Test), u32>("main", |(x, test)| {
-        let p_u32 = host_fn(print_hello::<u32> as extern "C" fn(u32));
-        let p_u64 = host_fn(print_hello::<u64> as extern "C" fn(u64));
-        p_u32.call(x);
-        p_u64.call(test.x().get());
-        p_u64.call(test.y().get());
-        test.y_mut().put(1);
-        add.call((x, x))
+    let main = ctx.func::<(u32, &mut HashMap<u32, u32>), u32>("main", |(x, mut map)| {
+        map.insert(x, x);
+        x + x
     });
 
     let main = ctx.get_compiled_function(main);
 
-    let mut test = Test {
-        x: 1232,
-        y: 125,
-    };
+    let mut map = HashMap::new();
 
-    dbg!(main.call((1, &mut test)));
+    dbg!(main.call((1, &mut map)));
 
-    dbg!(test);
+    dbg!(map);
 }

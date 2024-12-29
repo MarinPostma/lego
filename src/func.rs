@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use std::collections::HashMap;
 use std::cell::RefCell;
 
-use cranelift::prelude::{Block, InstBuilder as _, Value};
+use cranelift::prelude::{Block, InstBuilder as _, Type, Value};
 use cranelift_frontend::{FunctionBuilder, Variable};
 use cranelift_jit::JITModule;
 use cranelift_module::{FuncId, Linkage, Module as _};
@@ -167,7 +167,9 @@ where
         }
     }
 
-    pub fn call(&self, params: impl IntoParams<P::Values>) -> R::Results {
+    pub fn call<T>(&self, params: T) -> R::Results
+        where T: IntoParams<Input = P>
+    {
         with_ctx(|ctx| {
             let fn_ref = ctx.module.declare_func_in_func(self.id, ctx.builder.func);
             let mut args = Vec::new();
@@ -242,38 +244,47 @@ impl HostFn for extern "C" fn()
     }
 }
 
-pub trait IntoParams<T> {
+pub trait IntoParams {
+    type Input;
+
     fn params(&self, ctx: &mut FnCtx, out: &mut Vec<Value>);
 }
 
-impl<T> IntoParams<Var<T>> for Var<T> {
+impl<T> IntoParams for Var<T> {
+    type Input = T;
+
     fn params(&self, ctx: &mut FnCtx, out: &mut Vec<Value>) {
         let val = ctx.builder.use_var(self.variable());
         out.push(val);
     }
 }
 
-impl<T> IntoParams<Var<T>> for Val<T> {
+impl<T> IntoParams for Val<T> {
+    type Input = T;
     fn params(&self, _ctx: &mut FnCtx, out: &mut Vec<Value>) {
         out.push(self.value());
     }
 }
 
-impl<A, B, C, D> IntoParams<(Var<C>, Var<D>)> for (A, B) where 
-    A: IntoParams<Var<C>>,
-    B: IntoParams<Var<D>>,
+impl<A, B> IntoParams for (A, B)
+where
+    A: IntoParams,
+    B: IntoParams,
 {
+    type Input = (A::Input, B::Input);
+
     fn params(&self, ctx: &mut FnCtx, out: &mut Vec<Value>) {
         self.0.params(ctx, out);
         self.1.params(ctx, out);
     }
 }
 
-impl<A1, A2, B1, B2, C1, C2> IntoParams<(Var<A1>, Var<B1>, Var<C1>)> for (A2, B2, C2) where 
-    A2: IntoParams<Var<A1>>,
-    B2: IntoParams<Var<B1>>,
-    C2: IntoParams<Var<C1>>,
+impl<A, B, C> IntoParams for (A, B, C) where 
+    A: IntoParams,
+    B: IntoParams,
+    C: IntoParams,
 {
+    type Input = (A::Input, B::Input, C::Input);
     fn params(&self, ctx: &mut FnCtx, out: &mut Vec<Value>) {
         self.0.params(ctx, out);
         self.1.params(ctx, out);

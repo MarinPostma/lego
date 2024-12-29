@@ -5,6 +5,8 @@ use std::ops::Deref;
 
 use cranelift::prelude::{types::*, InstBuilder as _, MemFlags};
 use cranelift::prelude::*;
+use cranelift_codegen::ir::SigRef;
+use cranelift_module::Module;
 
 use crate::func::{host_fn, with_ctx, FnCtx, IntoParams, Param};
 use crate::types::{IntoVal, Val};
@@ -30,6 +32,12 @@ impl<T> ProxyMut<T> {
     #[doc(hidden)]
     pub fn new(addr: Value, offset: i32) -> Self {
         Self(Proxy::new(addr, offset))
+    }
+
+    fn get_mut(&mut self) -> RefMut<T> {
+        RefMut {
+            proxy: self.0.get_ref(),
+        }
     }
 }
 
@@ -75,19 +83,46 @@ impl<T> Proxy<T> {
     pub fn new(addr: Value, offset: i32) -> Self {
         Self { addr, offset, _pth: PhantomData }
     }
-}
 
-impl<T> IntoParams<&mut T> for Proxy<T> {
-    fn params(&self, _ctx: &mut FnCtx, out: &mut Vec<Value>) {
-        out.push(self.addr());
+    pub fn get_ref(&self) -> Ref<T> {
+        Ref{ proxy: self }
     }
 }
 
-impl<K, V> Proxy<HashMap<K, V>>
+pub struct Ref<'a, T> {
+    proxy: &'a Proxy<T>
+}
+
+pub struct RefMut<'a, T> {
+    proxy: Ref<'a, T>,
+}
+
+impl<'a, T> IntoParams for RefMut<'a, T> {
+    type Input = &'a mut T;
+
+    fn params(&self, ctx: &mut FnCtx, out: &mut Vec<Value>) {
+        self.proxy.params(ctx, out)
+    }
+}
+
+impl<'a, T> IntoParams for Ref<'a, T> {
+    type Input = &'a T;
+
+    fn params(&self, ctx: &mut FnCtx, out: &mut Vec<Value>) {
+        let addr =if self.proxy.offset() != 0 {
+            ctx.builder().ins().iadd_imm(self.proxy.addr(), self.proxy.offset() as i64)
+        } else {
+            self.proxy.addr()
+        };
+        out.push(addr);
+    }
+}
+
+impl<K, V> ProxyMut<HashMap<K, V>>
 {
-    pub fn insert<'a>(&'a mut self, k: impl IntoParams<K>, v: impl IntoParams<V>)
+    pub fn insert<'a>(&'a mut self, k: impl IntoParams<Input = K>, v: impl IntoParams<Input = V>)
     where 
-        K: Hash + Eq + Param + 'a,
+        K: Hash + Eq + 'a + Param,
         V: Param + 'a,
     {
         extern "C" fn insert<'b, K, V>(map: &'b mut HashMap<K, V>, k: K, v: V)
@@ -97,8 +132,21 @@ impl<K, V> Proxy<HashMap<K, V>>
             map.insert(k, v);
         }
 
-        let f = host_fn(insert::<K, V> as extern "C" fn (&'a mut HashMap<K, V>, k: K, v: V));
+        let f = (insert::<K, V> as extern "C" fn (&'a mut HashMap<K, V>, k: K, v: V)) as usize;
 
-        f.call((self, k, v));
+        with_ctx(|ctx| {
+            // TODO memoize!
+            // TODO: factorize pattern
+            let ptr_ty = ctx.module().target_config().pointer_type();
+            let mut sig = ctx.module().make_signature();
+            sig.params.push(AbiParam::new(ptr_ty));
+            K::to_abi_params(&mut sig.params);
+            V::to_abi_params(&mut sig.params);
+            let sigref = ctx.builder().import_signature(sig);
+            let callee = ctx.builder().ins().iconst(ptr_ty, f as i64);
+            let mut args = Vec::new();
+            (self.get_ref(), k, v).params(ctx, &mut args);
+            ctx.builder().ins().call_indirect(sigref, callee, &args);
+        });
     }
 }
