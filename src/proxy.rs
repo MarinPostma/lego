@@ -3,24 +3,21 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 use std::ops::Deref;
 
-use cranelift::prelude::{types::*, InstBuilder as _, MemFlags};
+use cranelift::prelude::{InstBuilder as _, MemFlags};
 use cranelift::prelude::*;
-use cranelift_codegen::ir::SigRef;
 use cranelift_module::Module;
 
-use crate::func::{host_fn, with_ctx, FnCtx, IntoParams, Param};
+use crate::func::{with_ctx, FnCtx, IntoParams, Param};
 use crate::types::{IntoVal, ToJitPrimitive, Val};
 
-
 impl<T: ToJitPrimitive> Proxy<T> {
-    fn load(&self, ctx: &mut FnCtx) -> Value {
-        ctx.builder.ins().load(T::ty(), MemFlags::new(), self.addr, self.offset)
+    fn load(&self, ctx: &mut FnCtx) -> Val<T> {
+        Val::new(ctx.builder.ins().load(T::ty(), MemFlags::new(), self.addr, self.offset))
     }
 
     pub fn get(&self) -> Val<T> {
         with_ctx(|ctx| {
-            let value = self.load(ctx);
-            Val::new(value)
+            self.load(ctx)
         })
     }
 }
@@ -34,7 +31,7 @@ impl<T> ProxyMut<T> {
         Self(Proxy::new(addr, offset))
     }
 
-    fn get_mut(&mut self) -> RefMut<T> {
+    pub fn get_mut(&mut self) -> RefMut<T> {
         RefMut {
             proxy: self.0.get_ref(),
         }
@@ -49,12 +46,12 @@ impl<T> Deref for ProxyMut<T> {
     }
 }
 
-impl ProxyMut<u64> {
+impl<T> ProxyMut<T> {
     fn store(&mut self, ctx: &mut FnCtx, val: Value) {
         ctx.builder.ins().store(MemFlags::new(), val, self.addr, self.offset);
     }
 
-    pub fn put(&mut self, val: impl IntoVal<u64>) {
+    pub fn put(&mut self, val: impl IntoVal<Ty = T>) {
         with_ctx(|ctx| {
             let val = val.into_val(ctx);
             self.store(ctx, val.value());
@@ -66,6 +63,14 @@ pub struct Proxy<T> {
     addr: Value,
     offset: i32,
     _pth: PhantomData<T>,
+}
+
+impl<T: ToJitPrimitive> IntoVal for Proxy<T> {
+    type Ty = T;
+
+    fn into_val(self, ctx: &mut FnCtx) -> Val<Self::Ty> {
+        self.load(ctx)
+    }
 }
 
 impl<T> Proxy<T> {
@@ -145,7 +150,8 @@ impl<K, V> ProxyMut<HashMap<K, V>>
             let sigref = ctx.builder().import_signature(sig);
             let callee = ctx.builder().ins().iconst(ptr_ty, f as i64);
             let mut args = Vec::new();
-            (self.get_ref(), k, v).params(ctx, &mut args);
+            // FIXME: There is a hole here: self.get_ref() works!
+            (self.get_mut(), k, v).params(ctx, &mut args);
             ctx.builder().ins().call_indirect(sigref, callee, &args);
         });
     }

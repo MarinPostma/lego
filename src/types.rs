@@ -7,6 +7,7 @@ use cranelift_frontend::Variable;
 use crate::func::FnCtx;
 
 pub trait ToJitPrimitive {
+    fn to_i64(self) -> i64;
     fn ty() -> Type;
 }
 
@@ -45,6 +46,10 @@ macro_rules! primitive_jit_ty {
     ($($src:ident => $dst:ident $(,)?)*) => {
         $(
             impl ToJitPrimitive for $src {
+                fn to_i64(self) -> i64 {
+                    self as i64
+                }
+
                 fn ty() -> Type {
                     $dst
                 }
@@ -118,26 +123,31 @@ impl<T> Val<T> {
     }
 }
 
-pub trait IntoVal<T> {
-    fn into_val(self, ctx: &mut FnCtx) -> Val<T>;
+pub trait IntoVal {
+    type Ty;
+
+    fn into_val(self, ctx: &mut FnCtx) -> Val<Self::Ty>;
 }
 
-impl IntoVal<u64> for Var<u64> {
-    fn into_val(self, ctx: &mut FnCtx) -> Val<u64> {
+impl<T> IntoVal for Var<T> {
+    type Ty = T;
+    fn into_val(self, ctx: &mut FnCtx) -> Val<T> {
         let val = ctx.builder.use_var(self.variable);
         Val::new(val)
     }
 }
 
-impl IntoVal<u64> for u64 {
-    fn into_val(self, ctx: &mut FnCtx) -> Val<u64> {
+impl IntoVal for u64 {
+    type Ty = u64;
+    fn into_val(self, ctx: &mut FnCtx) -> Val<Self::Ty> {
         let value =ctx.builder.ins().iconst(Self::ty(), self as i64);
         Val::new(value)
     }
 }
 
-impl<T> IntoVal<T> for Val<T> {
-    fn into_val(self, _ctx: &mut FnCtx) -> Val<T> {
+impl<T> IntoVal for Val<T> {
+    type Ty = T;
+    fn into_val(self, _ctx: &mut FnCtx) -> Val<Self::Ty> {
         self
     }
 }

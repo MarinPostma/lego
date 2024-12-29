@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use std::collections::HashMap;
 use std::cell::RefCell;
 
-use cranelift::prelude::{Block, InstBuilder as _, Type, Value};
+use cranelift::prelude::{Block, InstBuilder, Value};
 use cranelift_frontend::{FunctionBuilder, Variable};
 use cranelift_jit::JITModule;
 use cranelift_module::{FuncId, Linkage, Module as _};
