@@ -1,5 +1,5 @@
 [package]
-name = "cranelift-lego"
+name = "lego"
 version = "0.1.0"
 edition = "2021"
 
@@ -10,3 +10,10 @@ cranelift-frontend = "0.115.0"
 cranelift-jit = "0.115.0"
 cranelift-module = "0.115.0"
 cranelift-native = "0.115.0"
+
+lego-macros = { path = "lego-macros" }
+
+[workspace]
+members = [
+    "lego-macros",
+]

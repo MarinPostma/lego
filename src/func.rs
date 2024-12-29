@@ -70,10 +70,20 @@ pub struct FnCtx<'a> {
     pub(crate) current_block: Block,
 }
 
-impl FnCtx<'_> {
-    fn declare_var(&mut self) -> Variable {
+impl<'a> FnCtx<'a> {
+    pub(crate) fn declare_var(&mut self) -> Variable {
         self.var_id += 1;
         Variable::from_u32(self.var_id - 1)
+    }
+
+    #[doc(hidden)]
+    pub fn builder(&mut self) -> &mut FunctionBuilder<'a> {
+        &mut self.builder
+    }
+
+    #[doc(hidden)]
+    pub fn module(&mut self) -> &mut JITModule {
+        self.module
     }
 }
 
@@ -90,7 +100,8 @@ where F: FnOnce() -> R,
     ret
 }
 
-pub(crate) fn with_ctx<R>(f: impl FnOnce(&mut FnCtx) -> R) -> R {
+#[doc(hidden)]
+pub fn with_ctx<R>(f: impl FnOnce(&mut FnCtx) -> R) -> R {
     FN_CTX.with(|ctx| {
         match *ctx.borrow_mut() {
             Some(ctx) => {
@@ -181,7 +192,7 @@ pub trait HostFn {
 
 impl<A, B> HostFn for extern "C" fn(A) -> B
 where
-    A: ToJitPrimitive,
+    A: Param,
     B: Results,
 {
     type Input = A;
@@ -213,7 +224,7 @@ impl<T> IntoParams<Var<T>> for Var<T> {
     }
 }
 
-impl IntoParams<Var<u32>> for Val<u32> {
+impl<T> IntoParams<Var<T>> for Val<T> {
     fn params(&self, _ctx: &mut FnCtx, out: &mut Vec<Value>) {
         out.push(self.value());
     }
@@ -241,15 +252,15 @@ impl Params for () {
     fn initialize(_ctx: &mut FnCtx) -> Self::Values { }
 }
 
-impl<T: ToJitPrimitive> Params for T {
-    type Values = Var<T>;
+impl<T: Param> Params for T {
+    type Values = T::Ty;
 
     fn initialize(ctx: &mut FnCtx) -> Self::Values {
-        initialize_param_at::<Self>(ctx, 0)
+        T::initialize_param_at(ctx, 0)
     }
 }
 
-fn initialize_param_at<T: ToJitPrimitive>(ctx: &mut FnCtx, idx: usize) -> Var<T> { 
+fn initialize_primitive_param_at<T: ToJitPrimitive>(ctx: &mut FnCtx, idx: usize) -> Var<T> { 
     let variable = ctx.declare_var();
     let val = ctx.builder.block_params(ctx.current_block)[idx];
     ctx.builder.declare_var(variable, T::ty());
@@ -258,20 +269,52 @@ fn initialize_param_at<T: ToJitPrimitive>(ctx: &mut FnCtx, idx: usize) -> Var<T>
     Var::new(variable)
 }
 
-impl<A, B> Params for (A, B)
-where 
-    A: ToJitPrimitive,
-    B: ToJitPrimitive,
-{
-    type Values = (Var<A>, Var<B>);
+pub trait Param: ToAbiParams {
+    type Ty;
 
-    fn initialize(ctx: &mut FnCtx) -> Self::Values {
-        (
-            initialize_param_at::<A>(ctx, 0),
-            initialize_param_at::<B>(ctx, 1),
-        ) 
-    }
+    fn initialize_param_at(ctx: &mut FnCtx, idx: usize) -> Self::Ty;
 }
+
+macro_rules! impl_param_primitives {
+    ($($ty:ident $(,)?)*) => {
+        $(
+            impl Param for $ty {
+                type Ty = Var<$ty>;
+
+                fn initialize_param_at(ctx: &mut FnCtx, idx: usize) -> Self::Ty {
+                    initialize_primitive_param_at::<$ty>(ctx, idx)
+                }
+            }
+        )*
+    };
+}
+
+impl_param_primitives![u8, u16, u32, u64, i8, i16, i32, i64];
+
+macro_rules! impl_params_tuples {
+    ($($ty:ident $(,)?)*) => {
+        impl<$($ty,)*> Params for ($($ty,)*)
+        where 
+            $($ty: Param,)*
+        {
+            type Values = ($($ty::Ty,)*);
+
+            #[allow(non_snake_case)] 
+            fn initialize(ctx: &mut FnCtx) -> Self::Values {
+                let mut idx = 0;
+                $(
+                    idx += 1;
+                    let $ty = $ty::initialize_param_at(ctx, idx - 1);
+                )*
+
+                ($($ty,)*) 
+            }
+        }
+    };
+}
+
+impl_params_tuples!(A, B);
+impl_params_tuples!(A, B, C);
 
 pub trait FromFuncRet {
     fn from_func_ret(vals: &[Value]) -> Self;
