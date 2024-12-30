@@ -1,64 +1,31 @@
-use std::marker::PhantomData;
+use cranelift::prelude::{Block, InstBuilder};
 
-use cranelift::prelude::InstBuilder;
+use crate::types::{ToJitPrimitive, Val};
+use crate::func::{with_ctx, FnCtx};
 
-use crate::{func::with_ctx, types::{ToJitPrimitive, Val}};
+pub struct If<C, B>(pub C, pub B);
+pub struct Then<T>(pub T);
+pub struct Else<E>(pub E);
 
-struct If<C>(pub C);
-struct Then<T>(pub T);
-struct Else<E>(pub E);
-
-struct Cond<C, T, E = ()> {
-    cond: If<C>,
-    then: Then<T>,
-    alt: Option<Else<E>>,
-}
-
-pub trait Branch {
+pub trait Conditional {
     type Output;
 
-    fn eval(self) -> Self::Output;
+    fn build(self) -> Self::Output;
 }
 
-impl Branch for () {
-    type Output = ();
-
-    fn eval(self) -> Self::Output {
-        todo!()
-    }
-}
-
-impl<C> Branch for If<C>
-    where C: FnOnce() -> Val<bool>
+impl<C, T, E, O> Conditional for If<C, (Then<T>, Else<E>)>
+where 
+    C: Cond,
+    Then<T>: Branch<Output = O>,
+    Else<E>: Branch<Output = O>,
+    O: BlockRet,
 {
-    type Output = Val<bool>;
+    type Output = O;
 
-    fn eval(self) -> Self::Output {
-        (self)()
-    }
-}
+    fn build(self) -> Self::Output {
+        let [then_block, else_block, merge_block] = with_ctx(make_cond_blocks::<O>);
 
-impl<C, T, E, O> Cond<C, T, E> 
-    where
-        Then<T>: Branch<Output = Val<O>>,
-        Else<E>: Branch<Output = Val<O>>,
-        If<C>: Branch<Output = Val<bool>>,
-        O: ToJitPrimitive,
-        
-{
-    pub fn build(self) -> O {
-        let (then_block, else_block, merge_block) = with_ctx(|ctx| {
-            let b = ctx.builder();
-            let then_block = b.create_block();
-            let else_block = b.create_block();
-            let merge_block = b.create_block();
-
-            b.append_block_param(merge_block, O::ty());
-
-            (then_block, else_block, merge_block)
-        });
-
-        let cond_val = self.cond.eval();
+        let cond_val = self.0.eval();
 
         with_ctx(|ctx| {
             let b = ctx.builder();
@@ -67,33 +34,144 @@ impl<C, T, E, O> Cond<C, T, E>
             b.seal_block(then_block);
         });
 
-        let then_val = self.then.eval();
+        let then_val = self.1.0.eval();
 
         with_ctx(|ctx| {
-            let b = ctx.builder();
-            b.ins().jump(merge_block, &[then_val]);
+            O::jump_to(then_val, ctx, merge_block);
+
+            ctx.builder().switch_to_block(else_block);
+            ctx.builder().seal_block(else_block);
         });
 
-        let else_val = if let Some(else_branch) = self.alt {
-            with_ctx(|ctx| {
-                let b = ctx.builder();
-                b.switch_to_block(else_block);
-                b.seal_block(else_block);
-            });
-
-            let else_val = else_branch.eval();
-        } else {
-            with_ctx(|ctx| {
-                ctx.builder().ins().iconst(0, O::ty());
-            })
-        };
+        let else_val = self.1.1.eval();
 
         with_ctx(|ctx| {
+            O::jump_to(else_val, ctx, merge_block);
+
             let b = ctx.builder();
-            b.ins().jump(merge_block, &[else_val]);
             b.switch_to_block(merge_block);
             b.seal_block(merge_block);
-            Val::new(b.block_params(merge_block)[0])
+            O::read_from_ret(ctx, merge_block)
         })
     }
+}
+
+/// Special case for single branch conditionals: Then must return `()`
+impl<C, T> Conditional for If<C, Then<T>> 
+    where
+    C: Cond,
+    Then<T>: Branch<Output = ()>
+{
+    type Output = ();
+
+    fn build(self) -> Self::Output {
+        If(self.0, (self.1, Else(EmptyElse))).build()
+    }
+}
+
+fn make_cond_blocks<T: BlockRet>(ctx: &mut FnCtx) -> [Block; 3] {
+    let b = ctx.builder();
+    let then_block = b.create_block();
+    let else_block = b.create_block();
+    let merge_block = b.create_block();
+
+    T::push_param_ty(ctx, merge_block);
+
+    [then_block, else_block, merge_block]
+}
+
+pub trait Branch {
+    type Output;
+
+    fn eval(self) -> Self::Output;
+}
+
+struct EmptyElse;
+
+impl Branch for Else<EmptyElse> {
+    type Output = ();
+
+    fn eval(self) -> Self::Output { }
+}
+
+impl<T, O> Branch for Then<T>
+where
+    T: FnOnce() -> Val<O>,
+    O: ToJitPrimitive,
+{
+    type Output = Val<O>;
+
+    fn eval(self) -> Self::Output {
+        (self.0)()
+    }
+}
+
+impl<T, O> Branch for Else<T>
+where
+    T: FnOnce() -> Val<O>,
+    O: ToJitPrimitive,
+{
+    type Output = Val<O>;
+
+    fn eval(self) -> Self::Output {
+        (self.0)()
+    }
+}
+
+/// Something the returns a Val<bool> that can be used in a comparison
+trait Cond {
+    fn eval(self) -> Val<bool>;
+}
+
+impl<C> Cond for C
+    where C: FnOnce() -> Val<bool>
+{
+    fn eval(self) -> Val<bool> {
+        (self)()
+    }
+}
+
+trait BlockRet {
+    /// push param ty for the passed block
+    fn push_param_ty(ctx: &mut FnCtx, block: Block);
+    fn jump_to(self, ctx: &mut FnCtx, block: Block);
+    fn read_from_ret(ctx: &mut FnCtx, block: Block) -> Self;
+}
+
+impl BlockRet for () {
+    fn push_param_ty(_ctx: &mut FnCtx, _block: Block) { }
+    fn jump_to(self, ctx: &mut FnCtx, block: Block) { 
+        ctx.builder().ins().jump(block, &[]);
+    }
+
+    fn read_from_ret(_ctx: &mut FnCtx, _block: Block) -> Self { }
+}
+
+impl<T: ToJitPrimitive> BlockRet for Val<T> {
+    fn push_param_ty(ctx: &mut FnCtx, block: Block) {
+        ctx.builder().append_block_param(block, T::ty());
+    }
+
+    fn jump_to(self, ctx: &mut FnCtx, block: Block) {
+        ctx.builder().ins().jump(block, &[self.value()]);
+    }
+
+    fn read_from_ret(ctx: &mut FnCtx, block: Block) -> Self {
+        Val::new(ctx.builder().block_params(block)[0])
+    }
+}
+
+#[macro_export]
+macro_rules! lego_if {
+    (if ($cond:expr) { $then:expr } else { $else:expr }) => {
+        {
+            use $crate::control_flow::Conditional;
+
+            $crate::control_flow::If(|| { $cond }, (
+                $crate::control_flow::Then(|| { $then }),
+                $crate::control_flow::Else(|| { $else }),
+            )).build()
+        }
+
+    };
 }

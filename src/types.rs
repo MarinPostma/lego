@@ -4,7 +4,7 @@ use cranelift::prelude::{AbiParam, InstBuilder, IntCC, Type, Value};
 use cranelift::prelude::types::*;
 use cranelift_frontend::Variable;
 
-use crate::func::FnCtx;
+use crate::func::{with_ctx, FnCtx};
 
 pub trait ToJitPrimitive {
     fn to_i64(self) -> i64;
@@ -113,15 +113,17 @@ pub struct Val<T> {
     _pth: PhantomData<T>,
 }
 
-impl Compare for Val<u64> {
-    fn eq(&self, ctx: &mut FnCtx, other: &Self) -> Val<bool> {
-        let val = ctx.builder().ins().icmp(IntCC::Equal, self.value(), other.value());
-        Val::new(val)
+impl Compare for Val<u32> {
+    fn eq(self, other: Self) -> Val<bool> {
+        with_ctx(|ctx| {
+            let val = ctx.builder().ins().icmp(IntCC::Equal, self.value(), other.value());
+            Val::new(val)
+        })
     }
 }
 
 pub trait Compare<Rhs = Self> {
-    fn eq(&self, ctx: &mut FnCtx, other: &Rhs) -> Val<bool>;
+    fn eq(self, other: Rhs) -> Val<bool>;
 }
 
 impl<T> Val<T> {

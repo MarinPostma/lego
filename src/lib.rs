@@ -5,6 +5,7 @@ pub mod arithmetic;
 pub mod datatype;
 pub mod refs;
 pub mod proxy;
+pub mod control_flow;
 
 pub use proxy::{Proxy, ProxyMut};
 pub use refs::JitSafe;

@@ -3,6 +3,8 @@ use std::time::Instant;
 
 use lego::ctx::Ctx;
 use lego::func::Call as _;
+use lego::lego_if;
+use lego::types::Compare as _;
 use lego_macros::LegoBlock;
 
 #[derive(LegoBlock, Debug)]
@@ -16,25 +18,49 @@ fn main() {
     let mut ctx = builder.build();
 
     let before = Instant::now();
-    let main = ctx.func::<(&Foo, &mut HashMap<u32, u32>), u32>("main", |(f, mut map)| {
-        map.insert(f.x() * 20 + f.y() + 10, f.x().get());
-        f.x() * 2
+    let main = ctx.func::<(&Foo, &mut HashMap<u32, u32>), u32>("main", |(f, map)| {
+        let x = f.x().get();
+        let y = f.x().get();
+        let val = lego_if! {
+            if (y.eq(x + 1)) {
+                x + 1
+            } else {
+                x + 2
+            }
+        };
+
+        val
     });
     dbg!(before.elapsed());
 
-    let before = Instant::now();
     let main = ctx.get_compiled_function(main);
 
     let mut map = HashMap::new();
     let f = Foo {
-        y: 42,
-        x: 1337,
+        y: 1,
+        x: 1,
     };
 
     dbg!(&map);
 
+    let before = Instant::now();
     dbg!(main.call((&f, &mut map)));
     dbg!(before.elapsed());
 
-    dbg!(map);
+    let before = Instant::now();
+    dbg!(native(&f, &mut map));
+    dbg!(before.elapsed());
+}
+
+fn native(f: &Foo, map: &mut HashMap<u32, u32>) -> u32 {
+    let x = f.x;
+    let y = f.y;
+
+    let val = if y == x + 1 {
+        x + 1
+    } else {
+        x + 2
+    };
+
+    val
 }
