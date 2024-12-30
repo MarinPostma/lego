@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use cranelift::prelude::{AbiParam, InstBuilder, Type, Value};
+use cranelift::prelude::{AbiParam, InstBuilder, IntCC, Type, Value};
 use cranelift::prelude::types::*;
 use cranelift_frontend::Variable;
 
@@ -111,6 +111,17 @@ impl<T> Var<T> {
 pub struct Val<T> {
     value: Value,
     _pth: PhantomData<T>,
+}
+
+impl Compare for Val<u64> {
+    fn eq(&self, ctx: &mut FnCtx, other: &Self) -> Val<bool> {
+        let val = ctx.builder().ins().icmp(IntCC::Equal, self.value(), other.value());
+        Val::new(val)
+    }
+}
+
+pub trait Compare<Rhs = Self> {
+    fn eq(&self, ctx: &mut FnCtx, other: &Rhs) -> Val<bool>;
 }
 
 impl<T> Val<T> {
