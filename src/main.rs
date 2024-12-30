@@ -19,13 +19,11 @@ fn main() {
 
     let before = Instant::now();
     let main = ctx.func::<(&Foo, &mut HashMap<u32, u32>), u32>("main", |(f, map)| {
-        let x = f.x().get();
-        let y = f.x().get();
         let val = lego_if! {
-            if (y.eq(x + 1)) {
-                x + 1
+            if (f.y().eq(f.x() + 1)) {
+                f.x() + 1
             } else {
-                x + 2
+                f.x() + 2
             }
         };
 
@@ -38,7 +36,7 @@ fn main() {
     let mut map = HashMap::new();
     let f = Foo {
         y: 1,
-        x: 1,
+        x: 0,
     };
 
     dbg!(&map);

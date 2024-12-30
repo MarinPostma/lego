@@ -172,6 +172,14 @@ macro_rules! lego_if {
                 $crate::control_flow::Else(|| { $else }),
             )).build()
         }
+    };
+    (if ($cond:expr) { $then:expr}) => {
+        {
+            use $crate::control_flow::Conditional;
 
+            $crate::control_flow::If(|| { $cond }, 
+                $crate::control_flow::Then(|| { $then }),
+            ).build()
+        }
     };
 }

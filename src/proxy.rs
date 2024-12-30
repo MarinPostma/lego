@@ -59,6 +59,7 @@ impl<T> ProxyMut<T> {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct Proxy<T> {
     addr: Value,
     offset: i32,

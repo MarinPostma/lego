@@ -113,10 +113,16 @@ pub struct Val<T> {
     _pth: PhantomData<T>,
 }
 
-impl Compare for Val<u32> {
-    fn eq(self, other: Self) -> Val<bool> {
+impl<T, U> Compare<U> for T 
+where
+    T: IntoVal<Ty = u32>,
+    U: IntoVal<Ty = u32>,
+{
+    fn eq(self, other: U) -> Val<bool> {
         with_ctx(|ctx| {
-            let val = ctx.builder().ins().icmp(IntCC::Equal, self.value(), other.value());
+            let lhs = self.into_val(ctx);
+            let rhs = other.into_val(ctx);
+            let val = ctx.builder().ins().icmp(IntCC::Equal, lhs.value(), rhs.value());
             Val::new(val)
         })
     }
