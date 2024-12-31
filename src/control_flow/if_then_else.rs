@@ -1,7 +1,8 @@
-use cranelift::prelude::{Block, InstBuilder};
+use cranelift::prelude::{Block, InstBuilder as _};
 
-use crate::types::{ToJitPrimitive, Val};
-use crate::func::{with_ctx, FnCtx};
+use crate::{func::{with_ctx, FnCtx}, types::{ToJitPrimitive, Val}};
+
+use super::{BlockRet, Cond};
 
 pub struct If<C, B>(pub C, pub B);
 pub struct Then<T>(pub T);
@@ -113,48 +114,6 @@ where
     }
 }
 
-/// Something the returns a Val<bool> that can be used in a comparison
-trait Cond {
-    fn eval(self) -> Val<bool>;
-}
-
-impl<C> Cond for C
-    where C: FnOnce() -> Val<bool>
-{
-    fn eval(self) -> Val<bool> {
-        (self)()
-    }
-}
-
-trait BlockRet {
-    /// push param ty for the passed block
-    fn push_param_ty(ctx: &mut FnCtx, block: Block);
-    fn jump_to(self, ctx: &mut FnCtx, block: Block);
-    fn read_from_ret(ctx: &mut FnCtx, block: Block) -> Self;
-}
-
-impl BlockRet for () {
-    fn push_param_ty(_ctx: &mut FnCtx, _block: Block) { }
-    fn jump_to(self, ctx: &mut FnCtx, block: Block) { 
-        ctx.builder().ins().jump(block, &[]);
-    }
-
-    fn read_from_ret(_ctx: &mut FnCtx, _block: Block) -> Self { }
-}
-
-impl<T: ToJitPrimitive> BlockRet for Val<T> {
-    fn push_param_ty(ctx: &mut FnCtx, block: Block) {
-        ctx.builder().append_block_param(block, T::ty());
-    }
-
-    fn jump_to(self, ctx: &mut FnCtx, block: Block) {
-        ctx.builder().ins().jump(block, &[self.value()]);
-    }
-
-    fn read_from_ret(ctx: &mut FnCtx, block: Block) -> Self {
-        Val::new(ctx.builder().block_params(block)[0])
-    }
-}
 
 #[macro_export]
 macro_rules! lego_if {
@@ -175,68 +134,6 @@ macro_rules! lego_if {
             $crate::control_flow::If(|| { $cond }, 
                 $crate::control_flow::Then(|| { $then }),
             ).build()
-        }
-    };
-}
-
-pub struct While<C, B>(pub C, pub Body<B>);
-
-pub struct Body<B>(pub B);
-
-pub trait Loop {
-    type Output;
-
-    fn build(self) -> Self::Output;
-}
-
-impl<C, B> Loop for While<C, B>
-where 
-    C: Cond,
-    Body<B>: Branch<Output = ()>,
-{
-    // TODO: allow loops returning values
-    type Output = ();
-
-    fn build(self) -> Self::Output {
-        let [header_block, body_block, exit_block] = with_ctx(|ctx| {
-            let [header_block, body_block, exit_block] = ctx.create_blocks();
-
-            let builder = ctx.builder();
-            builder.ins().jump(header_block, &[]);
-            builder.switch_to_block(header_block);
-            [header_block, body_block, exit_block]
-        });
-
-        let header_val = self.0.eval();
-
-        with_ctx(|ctx| {
-            let builder = ctx.builder();
-            builder.ins().brif(header_val.value(), body_block, &[], exit_block, &[]);
-            builder.switch_to_block(body_block);
-            builder.seal_block(body_block);
-        });
-
-        self.1.eval();
-
-        with_ctx(|ctx| {
-            let builder = ctx.builder();
-            builder.ins().jump(header_block, &[]);
-            builder.switch_to_block(exit_block);
-            builder.seal_block(header_block);
-            builder.seal_block(exit_block);
-        });
-    }
-}
-
-#[macro_export]
-macro_rules! lego_while {
-    (while ($hader:expr) { $($body:tt)* }) => {
-        {
-            use $crate::control_flow::Loop;
-
-            $crate::control_flow::While(|| { $cond }, (
-                $crate::control_flow::Body(|| { $($body)* }),
-            )).build()
         }
     };
 }

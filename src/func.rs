@@ -7,8 +7,9 @@ use cranelift_frontend::{FunctionBuilder, Variable};
 use cranelift_jit::JITModule;
 use cranelift_module::{FuncId, Linkage, Module as _};
 
-use crate::types::{ToAbiParams, ToJitPrimitive, Val, Var};
+use crate::types::{ToAbiParams, ToJitPrimitive, Val};
 use crate::ctx::Ctx;
+use crate::var::Var;
 
 thread_local! {
     static FN_CTX: RefCell<Option<*mut FnCtx<'static>>> = const { RefCell::new(None) };
@@ -259,15 +260,6 @@ pub trait IntoParams {
     fn params(&self, ctx: &mut FnCtx, out: &mut Vec<Value>);
 }
 
-impl<T> IntoParams for Var<T> {
-    type Input = T;
-
-    fn params(&self, ctx: &mut FnCtx, out: &mut Vec<Value>) {
-        let val = ctx.builder.use_var(self.variable());
-        out.push(val);
-    }
-}
-
 impl<T> IntoParams for Val<T> {
     type Input = T;
     fn params(&self, _ctx: &mut FnCtx, out: &mut Vec<Value>) {
@@ -327,7 +319,7 @@ fn initialize_primitive_param_at<T: ToJitPrimitive>(ctx: &mut FnCtx, idx: usize)
     ctx.builder.declare_var(variable, T::ty());
     ctx.builder.def_var(variable, val);
 
-    Var::new(variable)
+    Var::from_variable(variable)
 }
 
 pub trait Param: ToAbiParams {

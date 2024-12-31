@@ -19,14 +19,14 @@ pub fn derive_lego_block(input: TokenStream) -> TokenStream {
 
 fn trait_proxy_fn_sig(vis: &Visibility, name: &Ident, ty: &Type) -> impl ToTokens {
     quote! {
-        #vis fn #name(&self) -> lego::Proxy<#ty>
+        #vis fn #name(&self) -> lego::prelude::Proxy<#ty>
     }
 }
 
 fn trait_proxy_mut_fn_sig(vis: &Visibility, name: &Ident, ty: &Type) -> impl ToTokens {
     let name = format_ident!("{name}_mut");
     quote! {
-        #vis fn #name(&self) -> lego::ProxyMut<#ty>
+        #vis fn #name(&self) -> lego::prelude::ProxyMut<#ty>
     }
 }
 
@@ -50,7 +50,7 @@ fn derive_struct(s: &DataStruct, _attrs: &[Attribute], name: &Ident, vis: &Visib
         let sig = trait_proxy_fn_sig(vis, field, &f.ty);
         quote! {
             #sig {
-                lego::Proxy::new(self.addr(), self.offset() + std::mem::offset_of!(#name, #field) as i32)
+                lego::prelude::Proxy::new(self.addr(), self.offset() + std::mem::offset_of!(#name, #field) as i32)
             }
         }
     });
@@ -60,7 +60,7 @@ fn derive_struct(s: &DataStruct, _attrs: &[Attribute], name: &Ident, vis: &Visib
         let sig = trait_proxy_mut_fn_sig(vis, field, &f.ty);
         quote! {
             #sig {
-                lego::ProxyMut::new(self.addr(), self.offset() + std::mem::offset_of!(#name, #field) as i32)
+                lego::prelude::ProxyMut::new(self.addr(), self.offset() + std::mem::offset_of!(#name, #field) as i32)
             }
         }
     });
@@ -74,14 +74,14 @@ fn derive_struct(s: &DataStruct, _attrs: &[Attribute], name: &Ident, vis: &Visib
             #(#trait_proxy_fns_mut)*
         }
 
-        impl #proxy_trait_ident for lego::Proxy<#name> {
+        impl #proxy_trait_ident for lego::prelude::Proxy<#name> {
             #(#trait_proxy_impls)*
         }
 
-        impl #proxy_trait_ident_mut for lego::ProxyMut<#name> {
+        impl #proxy_trait_ident_mut for lego::prelude::ProxyMut<#name> {
             #(#trait_proxy_mut_impls)*
         }
 
-        unsafe impl lego::JitSafe for #name {}
+        unsafe impl lego::prelude::JitSafe for #name {}
     }
 }

@@ -2,9 +2,10 @@ use std::ops::{Add, Mul};
 
 use cranelift::prelude::{InstBuilder as _, TrapCode, Value};
 
-use crate::types::{IntoVal, ToJitPrimitive, Val, Var};
+use crate::proxy::Proxy;
+use crate::types::{AsVal, ToJitPrimitive, Val};
 use crate::func::{with_ctx, FnCtx};
-use crate::Proxy;
+use crate::var::Var;
 
 trait IntAdd: ToJitPrimitive {
     fn perform(ctx: &mut FnCtx, lhs: Value, rhs: Value) -> Value;
@@ -76,7 +77,7 @@ macro_rules! impl_op {
 
                 fn $f(self, rhs: T) -> Self::Output {
                     with_ctx(|ctx| -> Val<T> {
-                        let lhs = self.into_val(ctx);
+                        let lhs = self.as_val(ctx);
                         let rhs = ctx.builder().ins().iconst(T::ty(), rhs.to_i64());
                         Val::new(T::perform(ctx, lhs.value(), rhs))
                     })
@@ -104,8 +105,8 @@ macro_rules! impl_op {
             
                 fn $f(self, rhs: $lhs<T>) -> Self::Output {
                     with_ctx(|ctx| -> Val<T> {
-                        let lhs = self.into_val(ctx);
-                        let rhs = rhs.into_val(ctx);
+                        let lhs = self.as_val(ctx);
+                        let rhs = rhs.as_val(ctx);
                         Val::new(T::perform(ctx, lhs.value(), rhs.value()))
                     })
                 }

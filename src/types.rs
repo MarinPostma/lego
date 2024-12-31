@@ -2,7 +2,6 @@ use std::marker::PhantomData;
 
 use cranelift::prelude::{AbiParam, InstBuilder, IntCC, Type, Value};
 use cranelift::prelude::types::*;
-use cranelift_frontend::Variable;
 
 use crate::func::{with_ctx, FnCtx};
 
@@ -47,6 +46,7 @@ macro_rules! primitive_jit_ty {
         $(
             impl ToJitPrimitive for $src {
                 fn to_i64(self) -> i64 {
+                    // FIXME: This is probably not good wrt signed integers
                     self as i64
                 }
 
@@ -91,38 +91,37 @@ impl_to_abi_params_tuples!(A, B, C, D, E);
 impl_to_abi_params_tuples!(A, B, C, D, E, F);
 impl_to_abi_params_tuples!(A, B, C, D, E, F, G);
 
-#[derive(Copy, Clone)]
-pub struct Var<T> {
-    variable: Variable,
-    _pth: PhantomData<T>,
-}
-
-impl<T> Var<T> {
-    pub fn new(variable: Variable) -> Self {
-        Self { variable, _pth: PhantomData }
-    }
-
-    pub(crate) fn variable(&self) -> Variable {
-        self.variable
-    }
-}
-
-#[derive(Copy, Clone)]
 pub struct Val<T> {
     value: Value,
     _pth: PhantomData<T>,
 }
 
-impl<T, U> Compare<U> for T 
+impl<T> Copy for Val<T> {}
+impl<T> Clone for Val<T> {
+    fn clone(&self) -> Self {
+        Self { value: self.value.clone(), _pth: self._pth.clone() }
+    }
+}
+
+impl<T, U> Compare<&U> for &T 
 where
-    T: IntoVal<Ty = u32>,
-    U: IntoVal<Ty = u32>,
+    T: AsVal<Ty = u32>,
+    U: AsVal<Ty = u32>,
 {
-    fn eq(self, other: U) -> Val<bool> {
+    fn eq(self, other: &U) -> Val<bool> {
         with_ctx(|ctx| {
-            let lhs = self.into_val(ctx);
-            let rhs = other.into_val(ctx);
+            let lhs = self.as_val(ctx);
+            let rhs = other.as_val(ctx);
             let val = ctx.builder().ins().icmp(IntCC::Equal, lhs.value(), rhs.value());
+            Val::new(val)
+        })
+    }
+
+    fn neq(self, other: &U) -> Val<bool> {
+        with_ctx(|ctx| {
+            let lhs = self.as_val(ctx);
+            let rhs = other.as_val(ctx);
+            let val = ctx.builder().ins().icmp(IntCC::NotEqual, lhs.value(), rhs.value());
             Val::new(val)
         })
     }
@@ -130,6 +129,7 @@ where
 
 pub trait Compare<Rhs = Self> {
     fn eq(self, other: Rhs) -> Val<bool>;
+    fn neq(self, other: Rhs) -> Val<bool>;
 }
 
 impl<T> Val<T> {
@@ -142,31 +142,34 @@ impl<T> Val<T> {
     }
 }
 
-pub trait IntoVal {
+pub trait AsVal {
     type Ty;
 
-    fn into_val(self, ctx: &mut FnCtx) -> Val<Self::Ty>;
+    fn as_val(&self, ctx: &mut FnCtx) -> Val<Self::Ty>;
 }
 
-impl<T> IntoVal for Var<T> {
+macro_rules! impl_into_var_primitive {
+    ($($prim:ident $(,)?)*) => {
+        $(
+            impl AsVal for $prim {
+                type Ty = $prim;
+                fn as_val(&self, ctx: &mut FnCtx) -> Val<Self::Ty> {
+                    let value =ctx.builder.ins().iconst(Self::ty(), *self as i64);
+                    Val::new(value)
+                }
+            }
+        )*
+    };
+}
+
+impl_into_var_primitive! {
+    u8, u16, u32, u64,
+    i8, i16, i32, i64,
+}
+
+impl<T> AsVal for Val<T> {
     type Ty = T;
-    fn into_val(self, ctx: &mut FnCtx) -> Val<T> {
-        let val = ctx.builder.use_var(self.variable);
-        Val::new(val)
-    }
-}
-
-impl IntoVal for u64 {
-    type Ty = u64;
-    fn into_val(self, ctx: &mut FnCtx) -> Val<Self::Ty> {
-        let value =ctx.builder.ins().iconst(Self::ty(), self as i64);
-        Val::new(value)
-    }
-}
-
-impl<T> IntoVal for Val<T> {
-    type Ty = T;
-    fn into_val(self, _ctx: &mut FnCtx) -> Val<Self::Ty> {
-        self
+    fn as_val(&self, _ctx: &mut FnCtx) -> Val<Self::Ty> {
+        *self
     }
 }

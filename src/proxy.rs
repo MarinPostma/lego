@@ -8,7 +8,7 @@ use cranelift::prelude::*;
 use cranelift_module::Module;
 
 use crate::func::{with_ctx, FnCtx, IntoParams, Param};
-use crate::types::{IntoVal, ToJitPrimitive, Val};
+use crate::types::{AsVal, ToJitPrimitive, Val};
 
 impl<T: ToJitPrimitive> Proxy<T> {
     fn load(&self, ctx: &mut FnCtx) -> Val<T> {
@@ -51,9 +51,9 @@ impl<T> ProxyMut<T> {
         ctx.builder.ins().store(MemFlags::new(), val, self.addr, self.offset);
     }
 
-    pub fn put(&mut self, val: impl IntoVal<Ty = T>) {
+    pub fn put(&mut self, val: impl AsVal<Ty = T>) {
         with_ctx(|ctx| {
-            let val = val.into_val(ctx);
+            let val = val.as_val(ctx);
             self.store(ctx, val.value());
         });
     }
@@ -66,10 +66,10 @@ pub struct Proxy<T> {
     _pth: PhantomData<T>,
 }
 
-impl<T: ToJitPrimitive> IntoVal for Proxy<T> {
+impl<T: ToJitPrimitive> AsVal for Proxy<T> {
     type Ty = T;
 
-    fn into_val(self, ctx: &mut FnCtx) -> Val<Self::Ty> {
+    fn as_val(&self, ctx: &mut FnCtx) -> Val<Self::Ty> {
         self.load(ctx)
     }
 }

@@ -3,8 +3,9 @@ use std::time::Instant;
 
 use lego::ctx::Ctx;
 use lego::func::Call as _;
-use lego::lego_if;
+use lego::lego_while;
 use lego::types::Compare as _;
+use lego::var::Var;
 use lego_macros::LegoBlock;
 
 #[derive(LegoBlock, Debug)]
@@ -13,26 +14,21 @@ struct Foo {
     x: u32,
 }
 
-enum Test {
-    A(String),
-    B(u64),
-}
-
 fn main() {
     let builder = Ctx::builder();
     let mut ctx = builder.build();
 
     let before = Instant::now();
-    let main = ctx.func::<(&Foo, &mut HashMap<u32, u32>), u32>("main", |(f, map)| {
-        let val = lego_if! {
-            if (f.y().eq(f.x() + 1)) {
-                f.x() + 1
-            } else {
-                f.x() + 2
+    let main = ctx.func::<(&Foo, &mut HashMap<u32, u32>), u32>("main", |(f, mut map)| {
+        let mut v = Var::new(0u32);
+        lego_while!{
+            while (v.neq(&10u32)) {
+                map.insert(v, v);
+                v.assign(v + 1);
             }
-        };
+        }
 
-        val
+        f.x().get()
     });
     dbg!(before.elapsed());
 
@@ -44,10 +40,12 @@ fn main() {
         x: 0,
     };
 
-    dbg!(&map);
 
     let before = Instant::now();
     dbg!(main.call((&f, &mut map)));
+
+    dbg!(&map);
+
     dbg!(before.elapsed());
 
     let before = Instant::now();
@@ -55,7 +53,7 @@ fn main() {
     dbg!(before.elapsed());
 }
 
-fn native(f: &Foo, map: &mut HashMap<u32, u32>) -> u32 {
+fn native(f: &Foo, _map: &mut HashMap<u32, u32>) -> u32 {
     let x = f.x;
     let y = f.y;
 

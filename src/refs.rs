@@ -3,9 +3,8 @@ use cranelift::prelude::types::I64;
 use cranelift_module::Module;
 
 use crate::func::Param;
-use crate::proxy::ProxyMut;
+use crate::proxy::{Proxy, ProxyMut};
 use crate::types::ToAbiParams;
-use crate::Proxy;
 
 /// Implented for types that can be shared with JIT
 /// # Safety
