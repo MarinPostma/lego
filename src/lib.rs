@@ -11,6 +11,7 @@ pub mod var;
 pub mod prelude {
     pub use crate::control_flow::while_loop::{While, Body};
     pub use crate::control_flow::if_then_else::{If, Then, Else};
+    pub use crate::types::Compare;
 
     pub use crate::proxy::{Proxy, ProxyMut};
 

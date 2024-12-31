@@ -1,6 +1,74 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote, ToTokens};
-use syn::{parse_macro_input, Attribute, DataStruct, DeriveInput, Ident, Type, Visibility};
+use syn::{parse::Parse, parse_macro_input, Attribute, DataStruct, DeriveInput, ExprIf, ExprWhile, Ident, Type, Visibility};
+
+struct LegoIfThenElse {
+    i: ExprIf,
+}
+
+impl Parse for LegoIfThenElse {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let i = input.parse::<ExprIf>()?;
+        Ok(Self { i })
+    }
+}
+
+impl ToTokens for LegoIfThenElse {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        let cond = &self.i.cond;
+        let then_branch = &self.i.then_branch;
+        match &self.i.else_branch {
+            Some((_, else_branch)) => {
+                quote! {
+                    lego::prelude::If::new(|| #cond)
+                        .then(lego::prelude::Then(|| #then_branch))
+                        .alt(lego::prelude::Else(|| #else_branch))
+                }.to_tokens(tokens);
+            }
+            None => {
+                quote! {
+                    lego::prelude::If::new(|| #cond)
+                        .then(lego::prelude::Then(|| #then_branch))
+                        .finish()
+                }.to_tokens(tokens);
+            }
+        }
+    }
+}
+
+struct LegoWhile {
+    w: ExprWhile,
+}
+
+impl Parse for LegoWhile {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let w = input.parse::<ExprWhile>()?;
+        Ok(Self { w })
+    }
+}
+
+impl ToTokens for LegoWhile {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        let cond = &self.w.cond;
+        let body = &self.w.body;
+        quote! {
+            lego::prelude::While::new(|| #cond)
+                .body(lego::prelude::Body(|| #body))
+        }.to_tokens(tokens);
+    }
+}
+
+#[proc_macro]
+pub fn lego_if(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as LegoIfThenElse);
+    quote! { #input }.into()
+}
+
+#[proc_macro]
+pub fn lego_while(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as LegoWhile);
+    quote! { #input }.into()
+}
 
 #[proc_macro_derive(LegoBlock)]
 pub fn derive_lego_block(input: TokenStream) -> TokenStream {

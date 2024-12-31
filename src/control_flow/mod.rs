@@ -18,7 +18,7 @@ impl<C> Cond for C
     }
 }
 
-trait BlockRet {
+pub trait BlockRet {
     /// push param ty for the passed block
     fn push_param_ty(ctx: &mut FnCtx, block: Block);
     fn jump_to(self, ctx: &mut FnCtx, block: Block);
@@ -47,3 +47,10 @@ impl<T: ToJitPrimitive> BlockRet for Val<T> {
         Val::new(ctx.builder().block_params(block)[0])
     }
 }
+
+pub trait Branch {
+    type Output;
+
+    fn eval(self) -> Self::Output;
+}
+

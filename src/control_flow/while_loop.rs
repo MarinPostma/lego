@@ -2,7 +2,7 @@ use cranelift::prelude::{Block, InstBuilder};
 
 use crate::func::with_ctx;
 
-use super::{if_then_else::Branch, Cond};
+use super::{Branch, Cond};
 
 pub struct While {
     header_block: Block,
