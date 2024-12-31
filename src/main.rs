@@ -13,6 +13,11 @@ struct Foo {
     x: u32,
 }
 
+enum Test {
+    A(String),
+    B(u64),
+}
+
 fn main() {
     let builder = Ctx::builder();
     let mut ctx = builder.build();

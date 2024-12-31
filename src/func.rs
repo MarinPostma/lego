@@ -76,6 +76,15 @@ impl<'a> FnCtx<'a> {
         Variable::from_u32(self.var_id - 1)
     }
 
+    pub(crate) fn create_blocks<const N: usize>(&mut self) -> [Block; N] {
+        let mut out = [Block::from_u32(0); N];
+        (0..N).for_each(|i| {
+            out[i] = self.builder().create_block();
+        });
+
+        out
+    }
+
     #[doc(hidden)]
     pub fn builder(&mut self) -> &mut FunctionBuilder<'a> {
         &mut self.builder

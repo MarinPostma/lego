@@ -70,13 +70,8 @@ impl<C, T> Conditional for If<C, Then<T>>
 }
 
 fn make_cond_blocks<T: BlockRet>(ctx: &mut FnCtx) -> [Block; 3] {
-    let b = ctx.builder();
-    let then_block = b.create_block();
-    let else_block = b.create_block();
-    let merge_block = b.create_block();
-
+    let [then_block, else_block, merge_block] = ctx.create_blocks();
     T::push_param_ty(ctx, merge_block);
-
     [then_block, else_block, merge_block]
 }
 
@@ -163,23 +158,85 @@ impl<T: ToJitPrimitive> BlockRet for Val<T> {
 
 #[macro_export]
 macro_rules! lego_if {
-    (if ($cond:expr) { $then:expr } else { $else:expr }) => {
+    (if ($cond:expr) { $($then:tt)* } else { $($else:expr)* }) => {
         {
             use $crate::control_flow::Conditional;
 
             $crate::control_flow::If(|| { $cond }, (
-                $crate::control_flow::Then(|| { $then }),
-                $crate::control_flow::Else(|| { $else }),
+                $crate::control_flow::Then(|| { $($then)* }),
+                $crate::control_flow::Else(|| { $($else)* }),
             )).build()
         }
     };
-    (if ($cond:expr) { $then:expr}) => {
+    (if ($cond:expr) { $then:expr }) => {
         {
             use $crate::control_flow::Conditional;
 
             $crate::control_flow::If(|| { $cond }, 
                 $crate::control_flow::Then(|| { $then }),
             ).build()
+        }
+    };
+}
+
+pub struct While<C, B>(pub C, pub Body<B>);
+
+pub struct Body<B>(pub B);
+
+pub trait Loop {
+    type Output;
+
+    fn build(self) -> Self::Output;
+}
+
+impl<C, B> Loop for While<C, B>
+where 
+    C: Cond,
+    Body<B>: Branch<Output = ()>,
+{
+    // TODO: allow loops returning values
+    type Output = ();
+
+    fn build(self) -> Self::Output {
+        let [header_block, body_block, exit_block] = with_ctx(|ctx| {
+            let [header_block, body_block, exit_block] = ctx.create_blocks();
+
+            let builder = ctx.builder();
+            builder.ins().jump(header_block, &[]);
+            builder.switch_to_block(header_block);
+            [header_block, body_block, exit_block]
+        });
+
+        let header_val = self.0.eval();
+
+        with_ctx(|ctx| {
+            let builder = ctx.builder();
+            builder.ins().brif(header_val.value(), body_block, &[], exit_block, &[]);
+            builder.switch_to_block(body_block);
+            builder.seal_block(body_block);
+        });
+
+        self.1.eval();
+
+        with_ctx(|ctx| {
+            let builder = ctx.builder();
+            builder.ins().jump(header_block, &[]);
+            builder.switch_to_block(exit_block);
+            builder.seal_block(header_block);
+            builder.seal_block(exit_block);
+        });
+    }
+}
+
+#[macro_export]
+macro_rules! lego_while {
+    (while ($hader:expr) { $($body:tt)* }) => {
+        {
+            use $crate::control_flow::Loop;
+
+            $crate::control_flow::While(|| { $cond }, (
+                $crate::control_flow::Body(|| { $($body)* }),
+            )).build()
         }
     };
 }
