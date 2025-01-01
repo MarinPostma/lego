@@ -7,10 +7,11 @@ use cranelift_frontend::{FunctionBuilder, Variable};
 use cranelift_jit::JITModule;
 use cranelift_module::{FuncId, Linkage, Module};
 
+use crate::{for_all_primitives, for_all_tuples, maybe_paren};
 use crate::primitive::ToPrimitive;
 use crate::abi_params::ToAbiParams;
 use crate::ctx::Ctx;
-use crate::val::Val;
+use crate::val::{Val, AsVal};
 use crate::var::Var;
 
 thread_local! {
@@ -217,10 +218,10 @@ pub trait IntoHostFn<P, R> {
     fn into_host_fn(self) -> HostFunc<Self, P, R> where  Self: Sized;
 }
 
-impl<P, R, F> IntoHostFn<P, R> for F
-where F: FnOnce(P) -> R
+impl<A, R, F> IntoHostFn<A, R> for F
+where F: FnOnce(A) -> R
 {
-    fn into_host_fn(self) -> HostFunc<Self, P, R> where  Self: Sized {
+    fn into_host_fn(self) -> HostFunc<Self, A, R> where  Self: Sized {
         HostFunc(self, PhantomData)
     }
 }
@@ -236,23 +237,35 @@ trait AsFnPtr<P, R> {
     fn as_fn_ptr() -> *const u8;
 }
 
-impl<P, R, F: Fn(P) -> R + Copy> AsFnPtr<P, R> for F {
-    fn as_fn_ptr() -> *const u8 {
-        #[allow(clippy::let_unit_value, path_statements)]
-        F::ASSERT_ZERO_SIZED;
+macro_rules! impl_as_fn_ptr {
+    ($($ty:ident $(,)?)*) => {
+        #[allow(unused_parens)]
+        #[allow(non_snake_case)]
+        impl<RET, FUN: Fn($($ty,)*) -> RET + Copy, $($ty),* > AsFnPtr<($($ty),*), RET> for FUN
+        where
+            $($ty: Param),*
+        {
+            fn as_fn_ptr() -> *const u8 {
+                #[allow(clippy::let_unit_value, path_statements)]
+                FUN::ASSERT_ZERO_SIZED;
 
-        extern "C" fn tramp<F: Fn(P) -> R, P, R>(x: P)  -> R {
-            // F is zero-size, we can create it out of thin air
-            let f: F = unsafe {
-                #[allow(clippy::uninit_assumed_init)]
-                MaybeUninit::uninit().assume_init()
-            };
-            f(x)
+                extern "C" fn tramp<FUN: Fn($($ty),*) -> RET, RET, $($ty,)*>($($ty: $ty),*)  -> RET {
+                    // F is zero-size, we can create it out of thin air
+                    let f: FUN = unsafe {
+                        #[allow(clippy::uninit_assumed_init)]
+                        MaybeUninit::uninit().assume_init()
+                    };
+                    f($($ty,)*)
+                }
+
+                (tramp::<FUN , RET, $($ty),*> as extern "C" fn($($ty),*) -> RET) as *const u8
+            }
         }
-
-        (tramp::<F, P, R> as extern "C" fn(P) -> R) as *const u8
-    }
+        
+    };
 }
+
+for_all_tuples!(impl_as_fn_ptr);
 
 impl<F, P, R> HostFn for HostFunc<F, P, R>
     where
@@ -285,38 +298,59 @@ pub trait IntoParams {
     fn params(&self, ctx: &mut FnCtx, out: &mut Vec<Value>);
 }
 
-impl<T> IntoParams for Val<T> {
-    type Input = T;
-    fn params(&self, _ctx: &mut FnCtx, out: &mut Vec<Value>) {
-        out.push(self.value());
-    }
+macro_rules! impl_into_params_for_as_val {
+    ($($ty:ident $(,)?)*) => {
+        #[allow(unused_parens, non_snake_case)]
+        impl<$($ty),*> IntoParams for maybe_paren!($($ty),*)
+        where
+            $($ty: AsVal),*
+        {
+            type Input = maybe_paren!($($ty::Ty),*);
+
+            fn params(&self, ctx: &mut FnCtx, out: &mut Vec<Value>) {
+                let ($($ty),*) = self;
+                $(
+                    out.push($ty.as_val(ctx).value());
+                )*
+            }
+        }
+    };
 }
 
-impl<A, B> IntoParams for (A, B)
-where
-    A: IntoParams,
-    B: IntoParams,
-{
-    type Input = (A::Input, B::Input);
+for_all_tuples!(impl_into_params_for_as_val);
 
-    fn params(&self, ctx: &mut FnCtx, out: &mut Vec<Value>) {
-        self.0.params(ctx, out);
-        self.1.params(ctx, out);
-    }
-}
+// impl<T> IntoParams for Val<T> {
+//     type Input = T;
+//     fn params(&self, _ctx: &mut FnCtx, out: &mut Vec<Value>) {
+//         out.push(self.value());
+//     }
+// }
 
-impl<A, B, C> IntoParams for (A, B, C) where 
-    A: IntoParams,
-    B: IntoParams,
-    C: IntoParams,
-{
-    type Input = (A::Input, B::Input, C::Input);
-    fn params(&self, ctx: &mut FnCtx, out: &mut Vec<Value>) {
-        self.0.params(ctx, out);
-        self.1.params(ctx, out);
-        self.2.params(ctx, out);
-    }
-}
+// impl<A, B> IntoParams for (A, B)
+// where
+//     A: IntoParams,
+//     B: IntoParams,
+// {
+//     type Input = (A::Input, B::Input);
+//
+//     fn params(&self, ctx: &mut FnCtx, out: &mut Vec<Value>) {
+//         self.0.params(ctx, out);
+//         self.1.params(ctx, out);
+//     }
+// }
+//
+// impl<A, B, C> IntoParams for (A, B, C) where 
+//     A: IntoParams,
+//     B: IntoParams,
+//     C: IntoParams,
+// {
+//     type Input = (A::Input, B::Input, C::Input);
+//     fn params(&self, ctx: &mut FnCtx, out: &mut Vec<Value>) {
+//         self.0.params(ctx, out);
+//         self.1.params(ctx, out);
+//         self.2.params(ctx, out);
+//     }
+// }
 
 pub trait Params: ToAbiParams {
     type Values;
@@ -328,14 +362,6 @@ impl Params for () {
     type Values = ();
 
     fn initialize(_ctx: &mut FnCtx) -> Self::Values { }
-}
-
-impl<T: Param> Params for T {
-    type Values = T::Ty;
-
-    fn initialize(ctx: &mut FnCtx) -> Self::Values {
-        T::initialize_param_at(ctx, 0)
-    }
 }
 
 fn initialize_primitive_param_at<T: ToPrimitive>(ctx: &mut FnCtx, idx: usize) -> Var<T> { 
@@ -353,29 +379,27 @@ pub trait Param: ToAbiParams {
     fn initialize_param_at(ctx: &mut FnCtx, idx: usize) -> Self::Ty;
 }
 
-macro_rules! impl_param_primitives {
-    ($($ty:ident $(,)?)*) => {
-        $(
-            impl Param for $ty {
-                type Ty = Var<$ty>;
+macro_rules! impl_param_primitive {
+    ($ty:ident) => {
+        impl Param for $ty {
+            type Ty = Var<$ty>;
 
-                fn initialize_param_at(ctx: &mut FnCtx, idx: usize) -> Self::Ty {
-                    initialize_primitive_param_at::<$ty>(ctx, idx)
-                }
+            fn initialize_param_at(ctx: &mut FnCtx, idx: usize) -> Self::Ty {
+                initialize_primitive_param_at::<$ty>(ctx, idx)
             }
-        )*
+        }
     };
 }
 
-impl_param_primitives![u8, u16, u32, u64, i8, i16, i32, i64];
+for_all_primitives!(impl_param_primitive);
 
 macro_rules! impl_params_tuples {
     ($($ty:ident $(,)?)*) => {
-        impl<$($ty,)*> Params for ($($ty,)*)
+        impl<$($ty,)*> Params for maybe_paren!($($ty),*)
         where 
             $($ty: Param,)*
         {
-            type Values = ($($ty::Ty,)*);
+            type Values = maybe_paren!($($ty::Ty),*);
 
             #[allow(non_snake_case)] 
             fn initialize(ctx: &mut FnCtx) -> Self::Values {
@@ -385,14 +409,13 @@ macro_rules! impl_params_tuples {
                     let $ty = $ty::initialize_param_at(ctx, idx - 1);
                 )*
 
-                ($($ty,)*) 
+                ($($ty),*) 
             }
         }
     };
 }
 
-impl_params_tuples!(A, B);
-impl_params_tuples!(A, B, C);
+for_all_tuples!(impl_params_tuples);
 
 pub trait FromFuncRet {
     fn from_func_ret(vals: &[Value]) -> Self;
@@ -417,8 +440,8 @@ pub trait Results: ToAbiParams {
     fn return_(ctx: &mut FnCtx, results: Self::Results);
 }
 
-impl Results for u32 {
-    type Results = Val<u32>;
+impl<T: ToPrimitive + ToAbiParams> Results for T {
+    type Results = Val<T>;
 
     fn return_(ctx: &mut FnCtx, results: Self::Results) {
         ctx.builder.ins().return_(&[results.value()]);
@@ -432,4 +455,3 @@ impl Results for () {
         ctx.builder.ins().return_(&[]);
     }
 }
-

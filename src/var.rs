@@ -1,8 +1,10 @@
 use std::marker::PhantomData;
 use std::ops::{AddAssign, BitAndAssign, BitOrAssign, BitXorAssign, DivAssign, MulAssign, RemAssign, SubAssign};
-use cranelift::prelude::*; use cranelift_frontend::Variable;
+
+use cranelift_frontend::Variable;
+
 use crate::arithmetic::{IntAdd, IntBitAnd, IntBitOr, IntBitXor, IntDiv, IntMul, IntRem, IntSub};
-use crate::func::{with_ctx, FnCtx, IntoParams};
+use crate::func::{with_ctx, FnCtx};
 use crate::primitive::ToPrimitive;
 use crate::val::{AsVal, Val};
 
@@ -55,15 +57,6 @@ impl<T> AsVal for Var<T> {
     fn as_val(&self, ctx: &mut FnCtx) -> Val<T> {
         let val = ctx.builder.use_var(self.variable);
         Val::from_value(val)
-    }
-}
-
-impl<T> IntoParams for Var<T> {
-    type Input = T;
-
-    fn params(&self, ctx: &mut FnCtx, out: &mut Vec<Value>) {
-        let val = ctx.builder.use_var(self.variable());
-        out.push(val);
     }
 }
 

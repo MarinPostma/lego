@@ -2,6 +2,7 @@ use std::ops::{Add, BitAnd, BitOr, Div, Mul, Rem, Shl, Shr, Sub, BitXor};
 
 use cranelift::prelude::{InstBuilder, Value};
 
+use crate::{for_all_primitives, map_ident};
 use crate::primitive::ToPrimitive;
 use crate::proxy::Proxy;
 use crate::func::{with_ctx, FnCtx};
@@ -14,14 +15,6 @@ macro_rules! make_arithmetic_traits {
             pub(crate) trait $name: ToPrimitive {
                 fn perform(ctx: &mut FnCtx, lhs: Value, rhs: Value) -> Value;
             }
-        )*
-    };
-}
-
-macro_rules! impl_for_all {
-    ($cb:ident: $($name:ident $(,)?)*) => {
-        $(
-            $cb!($name);
         )*
     };
 }
@@ -88,9 +81,9 @@ macro_rules! impl_unsigned {
     };
 }
 
-impl_for_all!(impl_common: u8, u16, u32, u64, i8, i16, i32, i64);
-impl_for_all!(impl_signed: i8, i16, i32, i64);
-impl_for_all!(impl_unsigned: u8, u16, u32, u64);
+for_all_primitives!(impl_common);
+map_ident!(impl_signed: i8, i16, i32, i64);
+map_ident!(impl_unsigned: u8, u16, u32, u64);
 
 // macro from hell?
 // We can't implement Add for all T that implement IntoVal

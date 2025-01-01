@@ -1,13 +1,13 @@
-use std::collections::HashMap;
-use std::hash::Hash;
+// use std::collections::HashMap;
+// use std::hash::Hash;
 use std::marker::PhantomData;
 use std::ops::Deref;
 
 use cranelift::prelude::{InstBuilder as _, MemFlags};
 use cranelift::prelude::*;
-use cranelift_module::Module;
+// use cranelift_module::Module;
 
-use crate::func::{with_ctx, FnCtx, IntoParams, Param};
+use crate::func::{with_ctx, FnCtx};
 use crate::primitive::ToPrimitive;
 use crate::val::{AsVal, Val};
 
@@ -30,12 +30,6 @@ impl<T> ProxyMut<T> {
     #[doc(hidden)]
     pub fn new(addr: Value, offset: i32) -> Self {
         Self(Proxy::new(addr, offset))
-    }
-
-    pub fn get_mut(&mut self) -> RefMut<T> {
-        RefMut {
-            proxy: self.0.get_ref(),
-        }
     }
 }
 
@@ -90,79 +84,60 @@ impl<T> Proxy<T> {
     pub fn new(addr: Value, offset: i32) -> Self {
         Self { addr, offset, _pth: PhantomData }
     }
-
-    pub fn get_ref(&self) -> Ref<T> {
-        Ref{ proxy: self }
-    }
 }
 
-pub struct Ref<'a, T> {
-    proxy: &'a Proxy<T>
-}
+impl<'a, T> AsVal for &'a Proxy<T> {
+    type Ty = &'a T;
 
-pub struct RefMut<'a, T> {
-    proxy: Ref<'a, T>,
-}
-
-impl<'a, T> IntoParams for &'a Proxy<T> {
-    type Input = &'a T;
-
-    fn params(&self, ctx: &mut FnCtx, out: &mut Vec<Value>) {
-        self.get_ref().params(ctx, out);
-    }
-}
-
-impl<'a, T> IntoParams for RefMut<'a, T> {
-    type Input = &'a mut T;
-
-    fn params(&self, ctx: &mut FnCtx, out: &mut Vec<Value>) {
-        self.proxy.params(ctx, out)
-    }
-}
-
-impl<'a, T> IntoParams for Ref<'a, T> {
-    type Input = &'a T;
-
-    fn params(&self, ctx: &mut FnCtx, out: &mut Vec<Value>) {
-        let addr = if self.proxy.offset() != 0 {
-            ctx.builder().ins().iadd_imm(self.proxy.addr(), self.proxy.offset() as i64)
+    fn as_val(&self, ctx: &mut FnCtx) -> Val<Self::Ty> {
+        let addr = if self.offset() != 0 {
+            ctx.builder().ins().iadd_imm(self.addr(), self.offset() as i64)
         } else {
-            self.proxy.addr()
+            self.addr()
         };
-        out.push(addr);
+        Val::from_value(addr)
     }
 }
 
-impl<K, V> ProxyMut<HashMap<K, V>>
-{
-    pub fn insert<'a>(&'a mut self, k: impl IntoParams<Input = K>, v: impl IntoParams<Input = V>)
-    where 
-        K: Hash + Eq + 'a + Param,
-        V: Param + 'a,
-    {
-        extern "C" fn insert<'b, K, V>(map: &'b mut HashMap<K, V>, k: K, v: V)
-        where K: Hash + Eq + 'b,
-            V: 'b,
-        {
-            map.insert(k, v);
-        }
+impl<'a, T> AsVal for &'a mut ProxyMut<T> {
+    type Ty = &'a mut T;
 
-        let f = (insert::<K, V> as extern "C" fn (&'a mut HashMap<K, V>, k: K, v: V)) as usize;
-
-        with_ctx(|ctx| {
-            // TODO memoize!
-            // TODO: factorize pattern
-            let ptr_ty = ctx.module().target_config().pointer_type();
-            let mut sig = ctx.module().make_signature();
-            sig.params.push(AbiParam::new(ptr_ty));
-            K::to_abi_params(&mut sig.params);
-            V::to_abi_params(&mut sig.params);
-            let sigref = ctx.builder().import_signature(sig);
-            let callee = ctx.builder().ins().iconst(ptr_ty, f as i64);
-            let mut args = Vec::new();
-            // FIXME: There is a hole here: self.get_ref() works!
-            (self.get_mut(), k, v).params(ctx, &mut args);
-            ctx.builder().ins().call_indirect(sigref, callee, &args);
-        });
+    fn as_val(&self, ctx: &mut FnCtx) -> Val<Self::Ty> {
+        let p = &self.0;
+        Val::from_value(p.as_val(ctx).value())
     }
 }
+
+// impl<K, V> ProxyMut<HashMap<K, V>>
+// {
+//     pub fn insert<'a>(&'a mut self, k: impl IntoParams<Input = K>, v: impl IntoParams<Input = V>)
+//     where 
+//         K: Hash + Eq + 'a + Param,
+//         V: Param + 'a,
+//     {
+//         extern "C" fn insert<'b, K, V>(map: &'b mut HashMap<K, V>, k: K, v: V)
+//         where K: Hash + Eq + 'b,
+//             V: 'b,
+//         {
+//             map.insert(k, v);
+//         }
+//
+//         let f = (insert::<K, V> as extern "C" fn (&'a mut HashMap<K, V>, k: K, v: V)) as usize;
+//
+//         with_ctx(|ctx| {
+//             // TODO memoize!
+//             // TODO: factorize pattern
+//             let ptr_ty = ctx.module().target_config().pointer_type();
+//             let mut sig = ctx.module().make_signature();
+//             sig.params.push(AbiParam::new(ptr_ty));
+//             K::to_abi_params(&mut sig.params);
+//             V::to_abi_params(&mut sig.params);
+//             let sigref = ctx.builder().import_signature(sig);
+//             let callee = ctx.builder().ins().iconst(ptr_ty, f as i64);
+//             let mut args = Vec::new();
+//             // FIXME: There is a hole here: self.get_ref() works!
+//             (self.get_mut(), k, v).params(ctx, &mut args);
+//             ctx.builder().ins().call_indirect(sigref, callee, &args);
+//         });
+//     }
+// }
