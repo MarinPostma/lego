@@ -11,7 +11,7 @@ use crate::abi_params::ToAbiParams;
 /// this should not be implemented manually, use proxy! isntead
 pub unsafe trait JitSafe {}
 
-impl<T: ?Sized> ToAbiParams for &T {
+impl<T> ToAbiParams for &T {
     fn to_abi_params(params: &mut Vec<AbiParam>) {
         // fixme: we actually need to pass the real pointer size
         params.push(AbiParam::new(I64));
@@ -25,7 +25,7 @@ impl<T> ToAbiParams for &mut T {
     }
 }
 
-impl<T: ?Sized> Param for &T {
+impl<T> Param for &T {
     type Ty = Proxy<T>;
 
     fn initialize_param_at(ctx: &mut crate::func::FnCtx, idx: usize) -> Self::Ty {

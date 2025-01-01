@@ -61,7 +61,7 @@ impl<T> ProxyMut<T> {
 }
 
 #[derive(Clone, Copy)]
-pub struct Proxy<T: ?Sized> {
+pub struct Proxy<T> {
     addr: Value,
     offset: i32,
     _pth: PhantomData<T>,
@@ -75,7 +75,7 @@ impl<T: ToPrimitive> AsVal for Proxy<T> {
     }
 }
 
-impl<T: ?Sized> Proxy<T> {
+impl<T> Proxy<T> {
     #[doc(hidden)]
     pub fn addr(&self) -> Value {
         self.addr
@@ -96,12 +96,20 @@ impl<T: ?Sized> Proxy<T> {
     }
 }
 
-pub struct Ref<'a, T: ?Sized> {
+pub struct Ref<'a, T> {
     proxy: &'a Proxy<T>
 }
 
 pub struct RefMut<'a, T> {
     proxy: Ref<'a, T>,
+}
+
+impl<'a, T> IntoParams for &'a Proxy<T> {
+    type Input = &'a T;
+
+    fn params(&self, ctx: &mut FnCtx, out: &mut Vec<Value>) {
+        self.get_ref().params(ctx, out);
+    }
 }
 
 impl<'a, T> IntoParams for RefMut<'a, T> {
@@ -112,11 +120,11 @@ impl<'a, T> IntoParams for RefMut<'a, T> {
     }
 }
 
-impl<'a, T: ?Sized> IntoParams for Ref<'a, T> {
+impl<'a, T> IntoParams for Ref<'a, T> {
     type Input = &'a T;
 
     fn params(&self, ctx: &mut FnCtx, out: &mut Vec<Value>) {
-        let addr =if self.proxy.offset() != 0 {
+        let addr = if self.proxy.offset() != 0 {
             ctx.builder().ins().iadd_imm(self.proxy.addr(), self.proxy.offset() as i64)
         } else {
             self.proxy.addr()

@@ -23,12 +23,12 @@ pub struct Func<P, R> {
     _pth: PhantomData<fn(P) -> R>,
 }
 
-pub struct CompiledFunc<P, R> {
+pub struct CompiledFunc<'a, P, R> {
     pub(crate) ptr: *const u8,
-    pub(crate) _pth: PhantomData<fn(P) -> R>,
+    pub(crate) _pth: PhantomData<&'a fn(P) -> R>,
 }
 
-impl<P, R> Call for CompiledFunc<P, R>
+impl<P, R> Call for CompiledFunc<'_, P, R>
 where
     P: Param,
 {
@@ -44,7 +44,7 @@ where
     }
 }
 
-impl<A, B, R> Call for CompiledFunc<(A, B), R> {
+impl<A, B, R> Call for CompiledFunc<'_, (A, B), R> {
     type Input = (A, B);
     type Output = R;
 
@@ -201,10 +201,9 @@ pub trait HostFn {
     fn emit_call(&self, ctx: &mut FnCtx, params: impl IntoParams<Input = Self::Params>) -> <Self::Returns as Results>::Results;
 }
 
+pub struct HostFunc<F, P, R>(F, PhantomData<fn(P) -> R>);
 
-pub struct HostFunc<F, T>(F, PhantomData<T>);
-
-impl<F, T> HostFunc<F, T> 
+impl<F, P, R> HostFunc<F, P, R> 
     where Self: HostFn
 {
     pub fn call(&self, params: impl IntoParams<Input = <Self as HostFn>::Params>) -> <<Self as HostFn>::Returns as Results>::Results {
@@ -214,14 +213,14 @@ impl<F, T> HostFunc<F, T>
     }
 }
 
-pub trait IntoHostFn<Sig> {
-    fn into_host_fn(self) -> HostFunc<Self, Sig> where  Self: Sized;
+pub trait IntoHostFn<P, R> {
+    fn into_host_fn(self) -> HostFunc<Self, P, R> where  Self: Sized;
 }
 
-impl<P, R, F> IntoHostFn<(P, R)> for F
+impl<P, R, F> IntoHostFn<P, R> for F
 where F: FnOnce(P) -> R
 {
-    fn into_host_fn(self) -> HostFunc<Self, (P, R)> where  Self: Sized {
+    fn into_host_fn(self) -> HostFunc<Self, P, R> where  Self: Sized {
         HostFunc(self, PhantomData)
     }
 }
@@ -243,6 +242,7 @@ impl<P, R, F: Fn(P) -> R + Copy> AsFnPtr<P, R> for F {
         F::ASSERT_ZERO_SIZED;
 
         extern "C" fn tramp<F: Fn(P) -> R, P, R>(x: P)  -> R {
+            // F is zero-size, we can create it out of thin air
             let f: F = unsafe {
                 #[allow(clippy::uninit_assumed_init)]
                 MaybeUninit::uninit().assume_init()
@@ -254,7 +254,7 @@ impl<P, R, F: Fn(P) -> R + Copy> AsFnPtr<P, R> for F {
     }
 }
 
-impl<F, P, R> HostFn for HostFunc<F, (P, R)>
+impl<F, P, R> HostFn for HostFunc<F, P, R>
     where
     F: (Fn(P) -> R) + AsFnPtr<P, R>,
     P: Param,
