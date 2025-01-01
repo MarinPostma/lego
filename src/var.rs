@@ -1,10 +1,7 @@
 use std::marker::PhantomData;
-use std::ops::{AddAssign, SubAssign, MulAssign};
-
-use cranelift::prelude::*;
-use cranelift_frontend::Variable;
-
-use crate::arithmetic::{IntAdd, IntMul, IntSub};
+use std::ops::{AddAssign, BitAndAssign, BitOrAssign, BitXorAssign, DivAssign, MulAssign, RemAssign, SubAssign};
+use cranelift::prelude::*; use cranelift_frontend::Variable;
+use crate::arithmetic::{IntAdd, IntBitAnd, IntBitOr, IntBitXor, IntDiv, IntMul, IntRem, IntSub};
 use crate::func::{with_ctx, FnCtx, IntoParams};
 use crate::primitive::ToPrimitive;
 use crate::val::{AsVal, Val};
@@ -92,3 +89,8 @@ macro_rules! impl_assign {
 impl_assign!(AddAssign, IntAdd, add_assign);
 impl_assign!(SubAssign, IntSub, sub_assign);
 impl_assign!(MulAssign, IntMul, mul_assign);
+impl_assign!(DivAssign, IntDiv, div_assign);
+impl_assign!(RemAssign, IntRem, rem_assign);
+impl_assign!(BitOrAssign, IntBitOr, bitor_assign);
+impl_assign!(BitAndAssign, IntBitAnd, bitand_assign);
+impl_assign!(BitXorAssign, IntBitXor, bitxor_assign);
