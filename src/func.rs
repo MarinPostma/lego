@@ -1,11 +1,11 @@
 use std::marker::PhantomData;
-use std::collections::HashMap;
 use std::cell::RefCell;
+use std::mem::MaybeUninit;
 
 use cranelift::prelude::{Block, InstBuilder, Value};
 use cranelift_frontend::{FunctionBuilder, Variable};
 use cranelift_jit::JITModule;
-use cranelift_module::{FuncId, Linkage, Module as _};
+use cranelift_module::{FuncId, Linkage, Module};
 
 use crate::types::{ToAbiParams, ToJitPrimitive, Val};
 use crate::ctx::Ctx;
@@ -66,7 +66,6 @@ pub trait Call {
 pub struct FnCtx<'a> {
     pub(crate) builder: FunctionBuilder<'a>,
     pub(crate) module: &'a mut JITModule,
-    pub(crate) host_fn_map: &'a HashMap<usize, &'static str>,
     pub(crate) var_id: u32,
     pub(crate) current_block: Block,
 }
@@ -153,7 +152,6 @@ where
             builder,
             var_id: 0,
             current_block: block0,
-            host_fn_map: &ctx.host_fn_map,
         };
 
         let params = P::initialize(&mut fn_ctx);
@@ -196,61 +194,85 @@ where
 }
 
 pub trait HostFn {
-    type Input: Params;
-    type Output: Results;
+    type Params;
+    type Returns: Results;
 
-    fn to_fn_ptr(self) -> *const u8;
+    fn emit_call(&self, ctx: &mut FnCtx, params: impl IntoParams<Input = Self::Params>) -> <Self::Returns as Results>::Results;
 }
 
-impl<A, B> HostFn for extern "C" fn(A) -> B
-where
-    A: Param,
-    B: Results,
-{
-    type Input = A;
-    type Output = B;
 
-    fn to_fn_ptr(self) -> *const u8 {
-        self as *const u8
+pub struct HostFunc<F, T>(F, PhantomData<T>);
+
+impl<F, T> HostFunc<F, T> 
+    where Self: HostFn
+{
+    pub fn call(&self, params: impl IntoParams<Input = <Self as HostFn>::Params>) -> <<Self as HostFn>::Returns as Results>::Results {
+        with_ctx(|ctx| {
+            self.emit_call(ctx, params)
+        })
     }
 }
 
-impl<A, B, C> HostFn for extern "C" fn(A, B) -> C
-where
-    A: Param,
-    B: Param,
-    C: Results,
-{
-    type Input = (A, B);
-    type Output = C;
+pub trait IntoHostFn<Sig> {
+    fn into_host_fn(self) -> HostFunc<Self, Sig> where  Self: Sized;
+}
 
-    fn to_fn_ptr(self) -> *const u8 {
-        self as *const u8
+impl<P, R, F> IntoHostFn<(P, R)> for F
+where F: FnOnce(P) -> R
+{
+    fn into_host_fn(self) -> HostFunc<Self, (P, R)> where  Self: Sized {
+        HostFunc(self, PhantomData)
     }
 }
 
-impl<A, B, C, D> HostFn for extern "C" fn(A, B, C) -> D
-where
-    A: Param,
-    B: Param,
-    C: Param,
-    D: Results,
-{
-    type Input = (A, B, C);
-    type Output = D;
+// adapted from https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=2d064fe8d7f579d0e59df9967861ee7a
+trait AssertZeroSized: Sized {
+    const ASSERT_ZERO_SIZED: () = [()][size_of::<Self>()];
+}
 
-    fn to_fn_ptr(self) -> *const u8 {
-        self as *const u8
+impl<T: Sized> AssertZeroSized for T {}
+
+trait AsFnPtr<P, R> {
+    fn as_fn_ptr() -> *const u8;
+}
+
+impl<P, R, F: Fn(P) -> R + Copy> AsFnPtr<P, R> for F {
+    fn as_fn_ptr() -> *const u8 {
+        F::ASSERT_ZERO_SIZED;
+
+        let f = |x| {
+            let f: F = unsafe {
+                MaybeUninit::uninit().assume_init()
+            };
+            f(x)
+        };
+
+        (f as fn(P) -> R) as *const u8
     }
 }
 
-impl HostFn for extern "C" fn()
+impl<F, P, R> HostFn for HostFunc<F, (P, R)>
+    where
+    F: (Fn(P) -> R) + AsFnPtr<P, R>,
+    P: Param,
+    R: Results,
 {
-    type Input = ();
-    type Output = ();
+    type Params = P;
+    type Returns = R;
 
-    fn to_fn_ptr(self) -> *const u8 {
-        self as *const u8
+    fn emit_call(&self, ctx: &mut FnCtx, params: impl IntoParams<Input = Self::Params>) -> R::Results {
+        let ptr_ty = ctx.module().target_config().pointer_type();
+        let mut sig = ctx.module().make_signature();
+        P::to_abi_params(&mut sig.params);
+        R::to_abi_params(&mut sig.returns);
+        let sigref = ctx.builder().import_signature(sig);
+
+        let fptr = ctx.builder().ins().iconst(ptr_ty, F::as_fn_ptr() as usize as i64);
+        let mut args = Vec::new();
+        params.params(ctx, &mut args);
+        let call =ctx.builder().ins().call_indirect(sigref, fptr, &args);
+        let results = ctx.builder().inst_results(call);
+        R::Results::from_func_ret(results)
     }
 }
 
@@ -407,22 +429,5 @@ impl Results for () {
     fn return_(ctx: &mut FnCtx, _results: Self::Results) {
         ctx.builder.ins().return_(&[]);
     }
-}
-
-/// Retrieve a host function. The host fuction must have been registered during context creation.
-pub fn host_fn<F: HostFn>(f: F) ->  Func<F::Input, F::Output> {
-    // todo: memoize?
-    with_ctx(|ctx| {
-        let p = f.to_fn_ptr() as usize;
-        let name = ctx.host_fn_map.get(&p).unwrap();
-        let mut sig = ctx.module.make_signature();
-        <F::Input as ToAbiParams>::to_abi_params(&mut sig.params);
-        <F::Output as ToAbiParams>::to_abi_params(&mut sig.returns);
-        let id = ctx.module.declare_function(name, Linkage::Import, &sig).unwrap();
-        Func {
-            id,
-            _pth: PhantomData,
-        }
-    })
 }
 

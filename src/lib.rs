@@ -16,4 +16,5 @@ pub mod prelude {
     pub use crate::proxy::{Proxy, ProxyMut};
 
     pub use crate::refs::JitSafe;
+    pub use crate::func::IntoHostFn;
 }

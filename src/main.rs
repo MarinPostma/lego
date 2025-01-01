@@ -14,28 +14,19 @@ struct Foo {
     x: u32,
 }
 
+fn say_hello(x: u32) -> u32 {
+    println!("hello: {x}");
+    x
+}
+
 fn main() {
     let builder = Ctx::builder();
     let mut ctx = builder.build();
 
     let before = Instant::now();
     let main = ctx.func::<(&Foo, &mut HashMap<u32, u32>), u32>("main", |(f, mut map)| {
-        let mut v = Var::new(0u32);
-        lego_while! {
-            while v.neq(&10u32) {
-                // map.insert(v, v);
-                lego_if! {
-                    if (v.eq(&5u32)) {
-                        map.insert(v, v + 100);
-                    } else {
-                        map.insert(v, v);
-                    }
-                };
-                v.assign(v + 1);
-            }
-        }
-
-        f.x().get()
+        let func = say_hello.into_host_fn();
+        func.call(f.x().get())
     });
     dbg!(before.elapsed());
 

@@ -13,7 +13,6 @@ pub struct Ctx {
     pub(crate) fn_builder_ctx: FunctionBuilderContext,
     pub(crate) module: JITModule,
     pub(crate) ctx: cranelift::prelude::codegen::Context,
-    pub(crate) host_fn_map: HashMap<usize, &'static str>,
 }
 
 #[derive(Default)]
@@ -73,7 +72,6 @@ impl CtxBuilder {
             fn_builder_ctx: FunctionBuilderContext::new(),
             ctx: module.make_context(),
             module,
-            host_fn_map,
         }
 
     }
