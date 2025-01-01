@@ -10,9 +10,13 @@ fn main() {
     // we can probably flip the traits so that we can let rust do the type inference?
     // TODO: I don't think we need to name the function
     let main = ctx.func::<(&&str, &&str), ()>("main", |(s1, s2)| {
-        let func = (|hello: &&str| { println!("hello: {hello}"); 0 }).into_host_fn();
-        func.call(&s1);
-        func.call(&s2);
+        let func = (|x: i64| { println!("hello: {x}"); 0 }).into_host_fn();
+        let x = Val::new(1i64);
+        let y = Val::new(1i64);
+        let mut tot = Var::new(x + y);
+        tot += 1i64;
+        tot *= 2i64;
+        func.call(tot);
     });
     dbg!(before.elapsed());
 

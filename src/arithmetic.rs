@@ -1,6 +1,6 @@
-use std::ops::{Add, Mul};
+use std::ops::{Add, BitAnd, BitOr, Div, Mul, Rem, Shl, Shr, Sub, BitXor};
 
-use cranelift::prelude::{InstBuilder as _, TrapCode, Value};
+use cranelift::prelude::{InstBuilder, Value};
 
 use crate::primitive::ToPrimitive;
 use crate::proxy::Proxy;
@@ -8,54 +8,89 @@ use crate::func::{with_ctx, FnCtx};
 use crate::var::Var;
 use crate::val::{Val, AsVal};
 
-trait IntAdd: ToPrimitive {
-    fn perform(ctx: &mut FnCtx, lhs: Value, rhs: Value) -> Value;
+macro_rules! make_arithmetic_traits {
+    ($($name:ident $(,)?)*) => {
+        $(
+            pub(crate) trait $name: ToPrimitive {
+                fn perform(ctx: &mut FnCtx, lhs: Value, rhs: Value) -> Value;
+            }
+        )*
+    };
 }
 
-trait IntMul: ToPrimitive {
-    fn perform(ctx: &mut FnCtx, lhs: Value, rhs: Value) -> Value;
+macro_rules! impl_for_all {
+    ($cb:ident: $($name:ident $(,)?)*) => {
+        $(
+            $cb!($name);
+        )*
+    };
+}
+
+make_arithmetic_traits! {
+    IntAdd,
+    IntSub,
+    IntMul,
+    IntDiv,
+    IntRem,
+    IntShl,
+    IntShr,
+    IntBitAnd,
+    IntBitOr,
+    IntBitXor,
+}
+
+macro_rules! impl_arithmetic {
+    ($ty:ident: $($name:ident => |$ctx:ident, $lhs:ident, $rhs:ident| $code:expr $(,)?)*) => {
+        $(
+            impl $name for $ty {
+                fn perform(ctx: &mut FnCtx, lhs: Value, rhs: Value) -> Value {
+                    let $ctx = ctx;
+                    let $lhs = lhs;
+                    let $rhs = rhs;
+                    $code
+                }
+            }
+        )*
+    };
+}
+
+macro_rules! impl_common {
+    ($ty:ident) => {
+        impl_arithmetic!($ty: 
+            IntAdd => |ctx, lhs, rhs| ctx.builder().ins().iadd(lhs, rhs),
+            IntSub => |ctx, lhs, rhs| ctx.builder().ins().isub(lhs, rhs),
+            IntMul => |ctx, lhs, rhs| ctx.builder().ins().imul(lhs, rhs),
+            IntShl => |ctx, lhs, rhs| ctx.builder().ins().ishl(lhs, rhs),
+            IntBitAnd => |ctx, lhs, rhs| ctx.builder().ins().band(lhs, rhs),
+            IntBitOr => |ctx, lhs, rhs| ctx.builder().ins().bor(lhs, rhs),
+            IntBitXor => |ctx, lhs, rhs| ctx.builder().ins().bxor(lhs, rhs),
+        );
+    };
+}
+
+macro_rules! impl_signed {
+    ($ty:ident) => {
+        impl_arithmetic!($ty: 
+            IntDiv => |ctx, lhs, rhs| ctx.builder().ins().sdiv(lhs, rhs),
+            IntRem => |ctx, lhs, rhs| ctx.builder().ins().srem(lhs, rhs),
+            IntShr => |ctx, lhs, rhs| ctx.builder().ins().sshr(lhs, rhs),
+        );
+    };
 }
 
 macro_rules! impl_unsigned {
-    ($($ty:ident $(,)?)*) => {
-        $(
-            impl IntAdd for $ty {
-                fn perform(ctx: &mut FnCtx, lhs: Value, rhs: Value) -> Value {
-                    ctx.builder.ins().uadd_overflow_trap(lhs, rhs, TrapCode::INTEGER_OVERFLOW)
-                }
-            }
-
-            impl IntMul for $ty {
-                fn perform(ctx: &mut FnCtx, lhs: Value, rhs: Value) -> Value {
-                    ctx.builder().ins().imul(lhs, rhs)
-                }
-            }
-        )*
+    ($ty:ident) => {
+        impl_arithmetic!($ty: 
+            IntDiv => |ctx, lhs, rhs| ctx.builder().ins().udiv(lhs, rhs),
+            IntRem => |ctx, lhs, rhs| ctx.builder().ins().urem(lhs, rhs),
+            IntShr => |ctx, lhs, rhs| ctx.builder().ins().ushr(lhs, rhs),
+        );
     };
 }
 
-impl_unsigned!(u8, u16, u32, u64);
-
-macro_rules! impl_signed_add {
-    ($($ty:ident $(,)?)*) => {
-        $(
-            impl IntAdd for $ty {
-                fn perform(ctx: &mut FnCtx, lhs: Value, rhs: Value) -> Value {
-                    ctx.builder.ins().iadd(lhs, rhs)
-                }
-            }
-
-            impl IntMul for $ty {
-                fn perform(_ctx: &mut FnCtx, _lhs: Value, _rhs: Value) -> Value {
-                    todo!()
-                    // ctx.builder().ins().smul_overflow(lhs, rhs)
-                }
-            }
-        )*
-    };
-}
-
-impl_signed_add!(i8, i16, i32, i64);
+impl_for_all!(impl_common: u8, u16, u32, u64, i8, i16, i32, i64);
+impl_for_all!(impl_signed: i8, i16, i32, i64);
+impl_for_all!(impl_unsigned: u8, u16, u32, u64);
 
 // macro from hell?
 // We can't implement Add for all T that implement IntoVal
@@ -107,3 +142,11 @@ macro_rules! impl_op {
 
 impl_op! { Add, IntAdd, add => [Var, Val, Proxy] }
 impl_op! { Mul, IntMul, mul => [Var, Val, Proxy] }
+impl_op! { Sub, IntSub, sub => [Var, Val, Proxy] }
+impl_op! { Div, IntDiv, div => [Var, Val, Proxy] }
+impl_op! { Rem, IntRem, rem => [Var, Val, Proxy] }
+impl_op! { Shl, IntShl, shl => [Var, Val, Proxy] }
+impl_op! { Shr, IntShr, shr => [Var, Val, Proxy] }
+impl_op! { BitAnd, IntBitAnd, bitand => [Var, Val, Proxy] }
+impl_op! { BitOr, IntBitOr, bitor => [Var, Val, Proxy] }
+impl_op! { BitXor, IntBitXor, bitxor => [Var, Val, Proxy] }
