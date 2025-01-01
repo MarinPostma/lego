@@ -3,10 +3,8 @@ use std::time::Instant;
 
 use lego::ctx::Ctx;
 use lego::func::Call as _;
-use lego::var::Var;
 use lego::prelude::*;
 use lego_macros::LegoBlock;
-use lego_macros::{lego_while, lego_if};
 
 #[derive(LegoBlock, Debug)]
 struct Foo {
@@ -14,40 +12,24 @@ struct Foo {
     x: u32,
 }
 
-fn say_hello(x: u32) -> u32 {
-    println!("hello: {x}");
-    x
-}
-
 fn main() {
     let builder = Ctx::builder();
     let mut ctx = builder.build();
 
     let before = Instant::now();
-    let main = ctx.func::<(&Foo, &mut HashMap<u32, u32>), u32>("main", |(f, mut map)| {
-        let func = say_hello.into_host_fn();
-        func.call(f.x().get())
+    // we can probably flip the traits so that we can let rust do the type inference?
+    // TODO: I don't think we need to name the function
+    let main = ctx.func::<&str, u32>("main", |s| {
+        let func = (|hello: &str| { println!("hello: {hello}"); 0 }).into_host_fn();
+        func.call(s.get_ref())
     });
     dbg!(before.elapsed());
 
     let main = ctx.get_compiled_function(main);
 
-    let mut map = HashMap::new();
-    let f = Foo {
-        y: 1,
-        x: 0,
-    };
-
 
     let before = Instant::now();
-    dbg!(main.call((&f, &mut map)));
-    dbg!(before.elapsed());
-
-    dbg!(&map);
-
-    let mut map = HashMap::new();
-    let before = Instant::now();
-    dbg!(native(&f, &mut map));
+    dbg!(main.call("helloooooo"));
     dbg!(before.elapsed());
 }
 

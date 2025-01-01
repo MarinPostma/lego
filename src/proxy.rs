@@ -60,7 +60,7 @@ impl<T> ProxyMut<T> {
 }
 
 #[derive(Clone, Copy)]
-pub struct Proxy<T> {
+pub struct Proxy<T: ?Sized> {
     addr: Value,
     offset: i32,
     _pth: PhantomData<T>,
@@ -74,7 +74,7 @@ impl<T: ToJitPrimitive> AsVal for Proxy<T> {
     }
 }
 
-impl<T> Proxy<T> {
+impl<T: ?Sized> Proxy<T> {
     #[doc(hidden)]
     pub fn addr(&self) -> Value {
         self.addr
@@ -95,7 +95,7 @@ impl<T> Proxy<T> {
     }
 }
 
-pub struct Ref<'a, T> {
+pub struct Ref<'a, T: ?Sized> {
     proxy: &'a Proxy<T>
 }
 
@@ -111,7 +111,7 @@ impl<'a, T> IntoParams for RefMut<'a, T> {
     }
 }
 
-impl<'a, T> IntoParams for Ref<'a, T> {
+impl<'a, T: ?Sized> IntoParams for Ref<'a, T> {
     type Input = &'a T;
 
     fn params(&self, ctx: &mut FnCtx, out: &mut Vec<Value>) {

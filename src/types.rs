@@ -98,9 +98,7 @@ pub struct Val<T> {
 
 impl<T> Copy for Val<T> {}
 impl<T> Clone for Val<T> {
-    fn clone(&self) -> Self {
-        Self { value: self.value.clone(), _pth: self._pth.clone() }
-    }
+    fn clone(&self) -> Self { *self }
 }
 
 impl<T, U> Compare<&U> for &T 

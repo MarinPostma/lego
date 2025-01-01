@@ -28,8 +28,7 @@ pub struct CompiledFunc<P, R> {
 
 impl<P, R> Call for CompiledFunc<P, R>
 where
-    P: ToJitPrimitive,
-    R: ToJitPrimitive,
+    P: Param,
 {
     type Input = P;
     type Output = R;
@@ -238,16 +237,18 @@ trait AsFnPtr<P, R> {
 
 impl<P, R, F: Fn(P) -> R + Copy> AsFnPtr<P, R> for F {
     fn as_fn_ptr() -> *const u8 {
+        #[allow(clippy::let_unit_value, path_statements)]
         F::ASSERT_ZERO_SIZED;
 
-        let f = |x| {
+        extern "C" fn tramp<F: Fn(P) -> R, P, R>(x: P)  -> R {
             let f: F = unsafe {
+                #[allow(clippy::uninit_assumed_init)]
                 MaybeUninit::uninit().assume_init()
             };
             f(x)
-        };
+        }
 
-        (f as fn(P) -> R) as *const u8
+        (tramp::<F, P, R> as extern "C" fn(P) -> R) as *const u8
     }
 }
 
@@ -420,7 +421,6 @@ impl Results for u32 {
     fn return_(ctx: &mut FnCtx, results: Self::Results) {
         ctx.builder.ins().return_(&[results.value()]);
     }
-    
 }
 
 impl Results for () {
