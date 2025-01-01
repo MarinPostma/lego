@@ -7,8 +7,10 @@ use cranelift_frontend::{FunctionBuilder, Variable};
 use cranelift_jit::JITModule;
 use cranelift_module::{FuncId, Linkage, Module};
 
-use crate::types::{ToAbiParams, ToJitPrimitive, Val};
+use crate::primitive::ToPrimitive;
+use crate::abi_params::ToAbiParams;
 use crate::ctx::Ctx;
+use crate::val::Val;
 use crate::var::Var;
 
 thread_local! {
@@ -336,7 +338,7 @@ impl<T: Param> Params for T {
     }
 }
 
-fn initialize_primitive_param_at<T: ToJitPrimitive>(ctx: &mut FnCtx, idx: usize) -> Var<T> { 
+fn initialize_primitive_param_at<T: ToPrimitive>(ctx: &mut FnCtx, idx: usize) -> Var<T> { 
     let variable = ctx.declare_var();
     let val = ctx.builder.block_params(ctx.current_block)[idx];
     ctx.builder.declare_var(variable, T::ty());
@@ -399,7 +401,7 @@ pub trait FromFuncRet {
 impl<T> FromFuncRet for Val<T> {
     fn from_func_ret(vals: &[Value]) -> Self {
         assert_eq!(vals.len(), 1);
-        Val::new(vals[0]) 
+        Val::from_value(vals[0]) 
     }
 }
 

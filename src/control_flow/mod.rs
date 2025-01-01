@@ -1,6 +1,8 @@
 use cranelift::prelude::{Block, InstBuilder as _};
 
-use crate::{func::FnCtx, types::{ToJitPrimitive, Val}};
+use crate::primitive::ToPrimitive;
+use crate::val::Val;
+use crate::func::FnCtx;
 
 pub mod while_loop;
 pub mod if_then_else;
@@ -34,7 +36,7 @@ impl BlockRet for () {
     fn read_from_ret(_ctx: &mut FnCtx, _block: Block) -> Self { }
 }
 
-impl<T: ToJitPrimitive> BlockRet for Val<T> {
+impl<T: ToPrimitive> BlockRet for Val<T> {
     fn push_param_ty(ctx: &mut FnCtx, block: Block) {
         ctx.builder().append_block_param(block, T::ty());
     }
@@ -44,7 +46,7 @@ impl<T: ToJitPrimitive> BlockRet for Val<T> {
     }
 
     fn read_from_ret(ctx: &mut FnCtx, block: Block) -> Self {
-        Val::new(ctx.builder().block_params(block)[0])
+        Val::from_value(ctx.builder().block_params(block)[0])
     }
 }
 

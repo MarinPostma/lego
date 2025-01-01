@@ -2,29 +2,19 @@ use std::ops::{Add, Mul};
 
 use cranelift::prelude::{InstBuilder as _, TrapCode, Value};
 
+use crate::primitive::ToPrimitive;
 use crate::proxy::Proxy;
-use crate::types::{AsVal, ToJitPrimitive, Val};
 use crate::func::{with_ctx, FnCtx};
 use crate::var::Var;
+use crate::val::{Val, AsVal};
 
-trait IntAdd: ToJitPrimitive {
+trait IntAdd: ToPrimitive {
     fn perform(ctx: &mut FnCtx, lhs: Value, rhs: Value) -> Value;
 }
 
-trait IntMul: ToJitPrimitive {
+trait IntMul: ToPrimitive {
     fn perform(ctx: &mut FnCtx, lhs: Value, rhs: Value) -> Value;
 }
-
-#[allow(private_bounds)]
-pub trait Integer: IntAdd {}
-
-macro_rules! impl_integer {
-    ($($ty:ident $(,)?)*) => {
-        $(impl Integer for $ty {})*
-    };
-}
-
-impl_integer!(u8, u16, u32, u64, i8, i16, i32, i64);
 
 macro_rules! impl_unsigned {
     ($($ty:ident $(,)?)*) => {
@@ -79,7 +69,7 @@ macro_rules! impl_op {
                     with_ctx(|ctx| -> Val<T> {
                         let lhs = self.as_val(ctx);
                         let rhs = ctx.builder().ins().iconst(T::ty(), rhs.to_i64());
-                        Val::new(T::perform(ctx, lhs.value(), rhs))
+                        Val::from_value(T::perform(ctx, lhs.value(), rhs))
                     })
                 }
             }
@@ -107,7 +97,7 @@ macro_rules! impl_op {
                     with_ctx(|ctx| -> Val<T> {
                         let lhs = self.as_val(ctx);
                         let rhs = rhs.as_val(ctx);
-                        Val::new(T::perform(ctx, lhs.value(), rhs.value()))
+                        Val::from_value(T::perform(ctx, lhs.value(), rhs.value()))
                     })
                 }
             }

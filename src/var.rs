@@ -3,7 +3,8 @@ use std::marker::PhantomData;
 use cranelift_frontend::Variable;
 use cranelift::prelude::*;
 
-use crate::types::{AsVal, ToJitPrimitive, Val};
+use crate::val::{AsVal, Val};
+use crate::primitive::ToPrimitive;
 use crate::func::{with_ctx, FnCtx, IntoParams};
 
 #[derive(Copy, Clone)]
@@ -14,7 +15,7 @@ pub struct Var<T> {
 
 impl<T> Var<T> {
     pub fn new(v: T) -> Self
-    where T: ToJitPrimitive
+    where T: ToPrimitive
     {
         with_ctx(|ctx| {
             let var = ctx.declare_var();
@@ -46,7 +47,7 @@ impl<T> AsVal for Var<T> {
     type Ty = T;
     fn as_val(&self, ctx: &mut FnCtx) -> Val<T> {
         let val = ctx.builder.use_var(self.variable);
-        Val::new(val)
+        Val::from_value(val)
     }
 }
 
