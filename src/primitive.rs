@@ -26,6 +26,20 @@ impl<T: Sized> ToPrimitive for &mut T {
     }
 }
 
+impl ToPrimitive for bool {
+    fn to_i64(self) -> i64 {
+        if self {
+            1
+        } else {
+            0
+        }
+    }
+
+    fn ty() -> Type {
+        I8
+    }
+}
+
 macro_rules! primitive_jit_ty {
     ($($src:ident => $dst:ident $(,)?)*) => {
         $(

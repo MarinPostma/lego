@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote, ToTokens};
-use syn::{parse::Parse, parse_macro_input, Attribute, DataStruct, DeriveInput, ExprIf, ExprWhile, Ident, Type, Visibility};
+use syn::{parse::{Parse, ParseStream}, parse_macro_input, visit_mut::VisitMut, Attribute, Block, DataStruct, DeriveInput, ExprBlock, ExprIf, ExprWhile, Ident, Type, Visibility};
 
 struct LegoIfThenElse {
     i: ExprIf,
@@ -56,6 +56,47 @@ impl ToTokens for LegoWhile {
                 .body(lego::prelude::Body(|| #body))
         }.to_tokens(tokens);
     }
+}
+
+struct RewriteVisitor;
+
+impl VisitMut for RewriteVisitor {
+    fn visit_expr_if_mut(&mut self, i: &mut syn::ExprIf) {
+        self.visit_expr_mut(&mut i.cond);
+        self.visit_block_mut(&mut i.then_branch);
+        if let Some((_, ref mut else_branch)) = i.else_branch {
+            self.visit_expr_mut(else_branch);
+        }
+
+        let cond = &i.cond;
+        let then = &i.then_branch;
+        let alt = if let Some((_, ref e)) = i.else_branch {
+            quote! {
+                lego::prelude::Else(|| #e)
+            }
+        } else {
+            quote! {
+                lego::prelude::Else(lego::prelude::Never)
+            }
+        };
+
+        let new = quote! {
+            if true {
+                (|| #cond).eval(lego::prelude::Then(|| #then), #alt)
+            } else {
+                unreachable!()
+            }
+        }.into();
+
+        *i = syn::parse::<ExprIf>(new).unwrap();
+    }
+}
+
+#[proc_macro]
+pub fn lego(input: TokenStream) -> TokenStream {
+    let mut input = parse_macro_input!(input as Block);
+    RewriteVisitor.visit_block_mut(&mut input);
+    quote! { #input }.into()
 }
 
 #[proc_macro]
