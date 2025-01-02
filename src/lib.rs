@@ -14,7 +14,7 @@ mod compare;
 
 pub mod prelude {
     pub use crate::control_flow::while_loop::{While, Body};
-    pub use crate::control_flow::if_then_else::{If, Then, Else, Cond2, Never};
+    pub use crate::control_flow::if_then_else::{Then, Else, Never, Cond};
     pub use crate::compare::Compare;
     pub use crate::val::Val;
     pub use crate::var::Var;
@@ -26,5 +26,5 @@ pub mod prelude {
     pub use crate::func::Call;
     pub use crate::ctx::Ctx;
 
-    pub use lego_macros::{lego_if, lego_while};
+    pub use lego_macros::lego;
 }

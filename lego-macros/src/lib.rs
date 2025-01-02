@@ -101,18 +101,6 @@ pub fn lego(input: TokenStream) -> TokenStream {
     quote! { #input }.into()
 }
 
-#[proc_macro]
-pub fn lego_if(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as LegoIfThenElse);
-    quote! { #input }.into()
-}
-
-#[proc_macro]
-pub fn lego_while(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as LegoWhile);
-    quote! { #input }.into()
-}
-
 #[proc_macro_derive(LegoBlock)]
 pub fn derive_lego_block(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
