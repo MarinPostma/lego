@@ -25,4 +25,6 @@ pub mod prelude {
     pub use crate::func::IntoHostFn;
     pub use crate::func::Call;
     pub use crate::ctx::Ctx;
+
+    pub use lego_macros::{lego_if, lego_while};
 }
