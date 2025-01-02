@@ -60,15 +60,31 @@ impl ToTokens for LegoWhile {
     }
 }
 
-struct RewriteVisitor;
+struct RewriteVisitor {
+    in_if: bool,
+}
+
+impl RewriteVisitor {
+    fn new() -> Self {
+        Self { in_if: false }
+    }
+}
 
 impl VisitMut for RewriteVisitor {
+    fn visit_expr_return_mut(&mut self, _i: &mut syn::ExprReturn) {
+        if self.in_if {
+            panic!("can't have return yet")
+        }
+    }
+
     fn visit_expr_if_mut(&mut self, i: &mut syn::ExprIf) {
+        self.in_if = true;
         self.visit_expr_mut(&mut i.cond);
         self.visit_block_mut(&mut i.then_branch);
         if let Some((_, ref mut else_branch)) = i.else_branch {
             self.visit_expr_mut(else_branch);
         }
+        self.in_if = false;
 
         let cond = &i.cond;
         let then = &i.then_branch;
@@ -97,7 +113,7 @@ impl VisitMut for RewriteVisitor {
 #[proc_macro]
 pub fn lego(input: TokenStream) -> TokenStream {
     let mut input = parse_macro_input!(input as Block);
-    RewriteVisitor.visit_block_mut(&mut input);
+    RewriteVisitor::new().visit_block_mut(&mut input);
     quote! { #input }.into()
 }
 
