@@ -9,7 +9,7 @@ fn main() {
 
     let before = Instant::now();
 
-    let main = ctx.func::<(&&str, &&str), ()>("main", |(_s1, _s2)| {
+    let main = ctx.func::<(&&str, &&str), ()>(|(_s1, _s2)| {
         lego_macros::lego!({
             if Val::new(true) {
                 println!("hello1");

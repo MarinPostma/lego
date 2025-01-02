@@ -1,6 +1,8 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote, ToTokens};
-use syn::{parse::{Parse, ParseStream}, parse_macro_input, visit_mut::VisitMut, Attribute, Block, DataStruct, DeriveInput, ExprBlock, ExprIf, ExprWhile, Ident, Type, Visibility};
+use syn::{parse_macro_input, Attribute, Block, DataStruct, DeriveInput, ExprIf, ExprWhile, Ident, Type, Visibility};
+use syn::visit_mut::VisitMut;
+use syn::parse::Parse;
 
 struct LegoIfThenElse {
     i: ExprIf,

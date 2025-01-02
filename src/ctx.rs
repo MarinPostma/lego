@@ -88,12 +88,12 @@ impl Ctx {
         Self::builder().build()
     }
 
-    pub fn func<P, R>(&mut self, name: &str, body: impl FnOnce(P::Values) -> R::Results) -> Func<P, R>
+    pub fn func<P, R>(&mut self, body: impl FnOnce(P::Values) -> R::Results) -> Func<P, R>
     where
         P: Params,
         R: Results,
     {
-        Func::new(self, name, body)
+        Func::new(self, body)
     }
 
     pub fn get_compiled_function<P, R>(&self, f: Func<P, R>) -> CompiledFunc<P, R> {

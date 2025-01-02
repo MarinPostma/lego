@@ -5,7 +5,7 @@ use std::mem::MaybeUninit;
 use cranelift::prelude::{Block, InstBuilder, Value};
 use cranelift_frontend::{FunctionBuilder, Variable};
 use cranelift_jit::JITModule;
-use cranelift_module::{FuncId, Linkage, Module};
+use cranelift_module::{FuncId, Module};
 
 use crate::{for_all_primitives, for_all_tuples, maybe_paren};
 use crate::primitive::ToPrimitive;
@@ -137,7 +137,7 @@ where
     P: Params,
     R: Results,
 {
-    pub(crate) fn new<B>(ctx: &mut Ctx, name: &str, body: B) -> Self
+    pub(crate) fn new<B>(ctx: &mut Ctx, body: B) -> Self
     where B: FnOnce(P::Values) -> R::Results,
     {
         P::to_abi_params(&mut ctx.ctx.func.signature.params);
@@ -166,7 +166,7 @@ where
 
         fn_ctx.builder.finalize();
 
-        let func_id = ctx.module.declare_function(name, Linkage::Export, &ctx.ctx.func.signature).unwrap();
+        let func_id = ctx.module.declare_anonymous_function(&ctx.ctx.func.signature).unwrap();
         ctx.module.define_function(func_id, &mut ctx.ctx).unwrap();
         ctx.module.clear_context(&mut ctx.ctx);
         ctx.module.finalize_definitions().unwrap();
