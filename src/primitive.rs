@@ -6,6 +6,26 @@ pub trait ToPrimitive {
     fn ty() -> Type;
 }
 
+impl<T: Sized> ToPrimitive for &T {
+    fn to_i64(self) -> i64 {
+        self as *const T as usize as i64
+    }
+
+    fn ty() -> Type {
+        Type::int_with_byte_size(size_of::<Self>() as u16).unwrap()
+    }
+}
+
+impl<T: Sized> ToPrimitive for &mut T {
+    fn to_i64(self) -> i64 {
+        self as *const T as usize as i64
+    }
+
+    fn ty() -> Type {
+        Type::int_with_byte_size(size_of::<Self>() as u16).unwrap()
+    }
+}
+
 macro_rules! primitive_jit_ty {
     ($($src:ident => $dst:ident $(,)?)*) => {
         $(

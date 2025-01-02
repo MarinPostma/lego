@@ -1,5 +1,6 @@
 use cranelift::prelude::AbiParam;
 
+use crate::for_all_tuples;
 use crate::primitive::ToPrimitive;
 
 pub trait ToAbiParams {
@@ -48,9 +49,4 @@ macro_rules! impl_to_abi_params_tuples {
     };
 }
 
-impl_to_abi_params_tuples!(A, B);
-impl_to_abi_params_tuples!(A, B, C);
-impl_to_abi_params_tuples!(A, B, C, D);
-impl_to_abi_params_tuples!(A, B, C, D, E);
-impl_to_abi_params_tuples!(A, B, C, D, E, F);
-impl_to_abi_params_tuples!(A, B, C, D, E, F, G);
+for_all_tuples!(impl_to_abi_params_tuples);
