@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use cranelift::prelude::{Block, InstBuilder as _};
 
 use crate::func::{with_ctx, FnCtx, FuncRet};
-use crate::val::{AsVal, Val};
+use crate::val::{Val};
 
 use super::BlockRet;
 
@@ -87,17 +87,17 @@ fn make_cond_blocks<T: BlockRet>(ctx: &mut FnCtx) -> [Block; 3] {
     [then_block, else_block, merge_block]
 }
 
-impl<C, B, R, T, A> Cond<Val<B>, R> for If3<C, Val<bool>, Val<B>, R, T, A>
+impl<C, B, R, T, A> Cond<B, R> for If3<C, Val<bool>, B, R, T, A>
 where
     C: FnMut() -> Val<bool>,
-    T: FnMut(&dyn Ctx<Val<B>, R>) -> ControlFlow<Val<B>, R>,
-    A: FnMut(&dyn Ctx<Val<B>, R>) -> ControlFlow<Val<B>, R>,
-    Val<B>: BlockRet,
+    T: FnMut(&dyn Ctx<B, R>) -> ControlFlow<B, R>,
+    A: FnMut(&dyn Ctx<B, R>) -> ControlFlow<B, R>,
+    B: BlockRet,
     R: FuncRet,
 {
-    fn eval(&mut self) -> ControlFlow<Val<B>, R> {
+    fn eval(&mut self) -> ControlFlow<B, R> {
 
-        let [then_block, else_block, merge_block] = with_ctx(make_cond_blocks::<Val<B>>);
+        let [then_block, else_block, merge_block] = with_ctx(make_cond_blocks::<B>);
 
         let cond_val = (self.cond)();
 
@@ -126,8 +126,8 @@ where
         let then_flow = with_ctx(|ctx| {
             let flow = match then_val {
                 ControlFlow::Break(val) => {
-                    let then_val = val.as_val(ctx);
-                    <Val<B>>::jump_to(then_val, ctx, merge_block);
+                    // let then_val = val.as_val(ctx);
+                    B::jump_to(val, ctx, merge_block);
                     ControlFlow::<(), R>::Break(())
                 },
                 ControlFlow::Ret(_) => todo!(),
@@ -145,7 +145,7 @@ where
         with_ctx(|ctx| {
             let else_flow = match else_val {
                 ControlFlow::Break(else_val) => {
-                    <Val<B>>::jump_to(else_val, ctx, merge_block);
+                    B::jump_to(else_val, ctx, merge_block);
                     ControlFlow::<_, R>::Break(())
                 },
                 ControlFlow::Ret(_) => todo!(),
@@ -160,7 +160,7 @@ where
             match (then_flow, else_flow) {
                 // If wither branch can return a value, then we break that value
                 (ControlFlow::Break(_), _) | (_, ControlFlow::Break(_)) => {
-                    ControlFlow::Break(<Val<B>>::read_from_ret(ctx, merge_block))
+                    ControlFlow::Break(B::read_from_ret(ctx, merge_block))
                 }
                 (ControlFlow::Ret(_), _) | (_, ControlFlow::Ret(_)) => unreachable!(),
                 (ControlFlow::Preempt, _) | (_, ControlFlow::Preempt) => ControlFlow::Preempt,

@@ -150,7 +150,7 @@ impl VisitMut for RewriteVisitor {
         panic!("can define closure in if yet");
     }
 
-    fn visit_expr_if_mut(&mut self, i: &mut syn::ExprIf) {
+    fn visit_expr_if_mut(&mut self, _i: &mut syn::ExprIf) {
         unreachable!()
     }
 }
