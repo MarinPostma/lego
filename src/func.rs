@@ -319,39 +319,6 @@ macro_rules! impl_into_params_for_as_val {
 
 for_all_tuples!(impl_into_params_for_as_val);
 
-// impl<T> IntoParams for Val<T> {
-//     type Input = T;
-//     fn params(&self, _ctx: &mut FnCtx, out: &mut Vec<Value>) {
-//         out.push(self.value());
-//     }
-// }
-
-// impl<A, B> IntoParams for (A, B)
-// where
-//     A: IntoParams,
-//     B: IntoParams,
-// {
-//     type Input = (A::Input, B::Input);
-//
-//     fn params(&self, ctx: &mut FnCtx, out: &mut Vec<Value>) {
-//         self.0.params(ctx, out);
-//         self.1.params(ctx, out);
-//     }
-// }
-//
-// impl<A, B, C> IntoParams for (A, B, C) where 
-//     A: IntoParams,
-//     B: IntoParams,
-//     C: IntoParams,
-// {
-//     type Input = (A::Input, B::Input, C::Input);
-//     fn params(&self, ctx: &mut FnCtx, out: &mut Vec<Value>) {
-//         self.0.params(ctx, out);
-//         self.1.params(ctx, out);
-//         self.2.params(ctx, out);
-//     }
-// }
-
 pub trait Params: ToAbiParams {
     type Values;
 

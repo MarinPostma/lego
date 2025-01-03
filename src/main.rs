@@ -9,16 +9,16 @@ fn main() {
 
     let before = Instant::now();
 
-    let main = ctx.func::<(&&str, &&str), ()>(|(_s1, _s2)| {
+    let main = ctx.func::<(&&str, &&str), i32>(|(_s1, _s2)| {
         lego!({
             if true {
-                if true {
-                    return
+                if false {
+                    return Val::new(12i32)
                 }
             }
 
-            println!("hello");
-        });
+            Val::new(23i32)
+        })
     });
     dbg!(before.elapsed());
 
