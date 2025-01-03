@@ -7,7 +7,7 @@ use cranelift_frontend::FunctionBuilderContext;
 use cranelift_jit::{JITBuilder, JITModule};
 use cranelift_module::Module as _;
 
-use crate::func::{CompiledFunc, Func, Params, Results};
+use crate::{func::{CompiledFunc, Func, Params, Results}, prelude::ControlFlow};
 
 pub struct Ctx {
     pub(crate) fn_builder_ctx: FunctionBuilderContext,
@@ -88,7 +88,7 @@ impl Ctx {
         Self::builder().build()
     }
 
-    pub fn func<P, R>(&mut self, body: impl FnOnce(P::Values) -> R::Results) -> Func<P, R>
+    pub fn func<P, R>(&mut self, body: impl FnOnce(P::Values) -> ControlFlow<(), R::Results>) -> Func<P, R>
     where
         P: Params,
         R: Results,

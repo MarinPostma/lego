@@ -73,8 +73,10 @@ impl RewriteVisitor {
 fn handle_control_flow(input: impl ToTokens) -> impl ToTokens {
     quote! {
         match #input {
-            lego::prelude::ControlFlow::Continue => (),
-            e => return e,
+            lego::prelude::ControlFlow::Continue => unreachable!(),
+            lego::prelude::ControlFlow::Break(v) => return lego::prelude::ControlFlow::Break(v),
+            lego::prelude::ControlFlow::Ret(v) => return lego::prelude::ControlFlow::Ret(v),
+            lego::prelude::ControlFlow::Preempt => return lego::prelude::ControlFlow::Preempt,
         }
     }
 }
@@ -86,6 +88,43 @@ impl VisitMut for RewriteVisitor {
 
     fn visit_expr_mut(&mut self, e: &mut syn::Expr) {
         match e {
+            Expr::If(i) => {
+                self.if_depth += 1;
+                self.visit_expr_mut(&mut i.cond);
+                self.visit_block_mut(&mut i.then_branch);
+                if let Some((_, ref mut else_branch)) = i.else_branch {
+                    self.visit_expr_mut(else_branch);
+                }
+
+                let cond = &i.cond;
+                let then = &i.then_branch;
+                let alt = if let Some((_, ref e)) = i.else_branch {
+                    quote! { #e }
+                } else {
+                    quote! { () }
+                };
+
+                self.if_depth -= 1;
+
+                let new = quote! {
+                    {
+                        #[allow(unreachable_code)]
+                        let r = lego::prelude::If3::new(
+                            || #cond,
+                            |__ctx__| lego::prelude::ControlFlow::Break(#then),
+                            |__ctx__| lego::prelude::ControlFlow::Break(#alt),
+                        ).eval();
+                        match r {
+                            lego::prelude::ControlFlow::Continue => return lego::prelude::ControlFlow::Continue,
+                            lego::prelude::ControlFlow::Break(v) => v,
+                            lego::prelude::ControlFlow::Ret(v) => return lego::prelude::ControlFlow::Ret(v),
+                            lego::prelude::ControlFlow::Preempt => return lego::prelude::ControlFlow::Preempt,
+                        }
+                    }
+                }.into();
+
+                *e = syn::parse::<Expr>(new).unwrap();
+            }
             Expr::Return(ret) => {
                 if let Some(ref mut e) = ret.expr {
                     self.visit_expr_mut(e);
@@ -112,47 +151,7 @@ impl VisitMut for RewriteVisitor {
     }
 
     fn visit_expr_if_mut(&mut self, i: &mut syn::ExprIf) {
-        self.if_depth += 1;
-        self.visit_expr_mut(&mut i.cond);
-        self.visit_block_mut(&mut i.then_branch);
-        if let Some((_, ref mut else_branch)) = i.else_branch {
-            self.visit_expr_mut(else_branch);
-        }
-
-        let cond = &i.cond;
-        let then = &i.then_branch;
-        let alt = if let Some((_, ref e)) = i.else_branch {
-            quote! { #e }
-        } else {
-            quote! { () }
-        };
-
-        self.if_depth -= 1;
-
-        let control_flow_ret = if self.if_depth != 0 {
-            quote! { return lego::prelude::ControlFlow::Ret(v) }
-        } else {
-            quote! { return v }
-        };
-
-        let new = quote! {
-            if true {
-                let r = lego::prelude::If3::new(
-                    || #cond,
-                    |__ctx__| lego::prelude::ControlFlow::Break(#then),
-                    |__ctx__| lego::prelude::ControlFlow::Break(#alt),
-                ).eval();
-                match r {
-                    lego::prelude::ControlFlow::Continue => unreachable!(),
-                    lego::prelude::ControlFlow::Break(v) => v,
-                    lego::prelude::ControlFlow::Ret(v) => #control_flow_ret,
-                }
-            } else {
-                unreachable!()
-            }
-        }.into();
-
-        *i = syn::parse::<ExprIf>(new).unwrap();
+        unreachable!()
     }
 }
 

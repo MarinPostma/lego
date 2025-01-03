@@ -2,7 +2,8 @@ use std::marker::PhantomData;
 
 use cranelift::prelude::{Block, InstBuilder as _};
 
-use crate::{func::{with_ctx, FnCtx, FromFuncRet, Results}, val::{AsVal, Val}};
+use crate::func::{with_ctx, FnCtx, FuncRet};
+use crate::val::{AsVal, Val};
 
 use super::BlockRet;
 
@@ -11,10 +12,15 @@ pub enum ControlFlow<B, R> {
     Break(B),
     Ret(R),
     Continue,
+    /// the control flow was preempted by branch. This happens when the branch returns instead of
+    /// yielding a value, when generating code. In this case, no jump to the merge block is
+    /// emitted
+    Preempt,
 }
 
 pub struct If3<
-    C,
+    C: FnMut() -> Test,
+    Test,
     B,
     R,
     T: FnMut(&dyn Ctx<B, R>) -> ControlFlow<B, R>,
@@ -27,12 +33,13 @@ pub struct If3<
 }
 
 impl<
-        C,
+        C: FnMut() -> Test,
+        Test,
         B,
         R,
         T: FnMut(&dyn Ctx<B, R>) -> ControlFlow<B, R>,
         A: FnMut(&dyn Ctx<B, R>) -> ControlFlow<B, R>,
-    > If3<C, B, R, T, A>
+    > If3<C, Test, B, R, T, A>
 {
     pub fn new(cond: C, then: T, alt: A) -> Self {
         Self {
@@ -48,11 +55,11 @@ pub trait Ctx<B, R> {
     fn ret(&self, r: R) -> ControlFlow<B, R>;
 }
 
-pub trait Cond<B, R, Ty> {
+pub trait Cond<B, R> {
     fn eval(&mut self) -> ControlFlow<B, R>;
 }
 
-impl<C, B, R, T, A> Cond<B, R, bool> for If3<C, B, R, T, A>
+impl<C, B, R, T, A> Cond<B, R> for If3<C, bool, B, R, T, A>
 where
     C: FnMut() -> bool,
     T: FnMut(&dyn Ctx<B, R>) -> ControlFlow<B, R>,
@@ -80,18 +87,17 @@ fn make_cond_blocks<T: BlockRet>(ctx: &mut FnCtx) -> [Block; 3] {
     [then_block, else_block, merge_block]
 }
 
-impl<C, B, R, T, A> Cond<B, R, Val<bool>> for If3<C, B, R, T, A>
+impl<C, B, R, T, A> Cond<Val<B>, R> for If3<C, Val<bool>, Val<B>, R, T, A>
 where
     C: FnMut() -> Val<bool>,
-    T: FnMut(&dyn Ctx<B, R>) -> ControlFlow<B, R>,
-    A: FnMut(&dyn Ctx<B, R>) -> ControlFlow<B, R>,
-    B: AsVal,
-    B::Ty: BlockRet,
-    R: FromFuncRet,
+    T: FnMut(&dyn Ctx<Val<B>, R>) -> ControlFlow<Val<B>, R>,
+    A: FnMut(&dyn Ctx<Val<B>, R>) -> ControlFlow<Val<B>, R>,
+    Val<B>: BlockRet,
+    R: FuncRet,
 {
-    fn eval(&mut self) -> ControlFlow<B, R> {
+    fn eval(&mut self) -> ControlFlow<Val<B>, R> {
 
-        let [then_block, else_block, merge_block] = with_ctx(make_cond_blocks::<B::Ty>);
+        let [then_block, else_block, merge_block] = with_ctx(make_cond_blocks::<Val<B>>);
 
         let cond_val = (self.cond)();
 
@@ -104,49 +110,62 @@ where
 
         struct C;
         impl<B, R> Ctx<B, R> for C
-            where R: FromFuncRet
+            where R: FuncRet
         {
             fn ret(&self, r: R) -> ControlFlow<B, R> {
                 with_ctx(|ctx| {
+                    r.return_(ctx);
                 });
-                todo!()
+                ControlFlow::Preempt
             }
         }
 
-        todo!()
+        let then_val = (self.then)(&C);
+
+
+        let then_flow = with_ctx(|ctx| {
+            let flow = match then_val {
+                ControlFlow::Break(val) => {
+                    let then_val = val.as_val(ctx);
+                    <Val<B>>::jump_to(then_val, ctx, merge_block);
+                    ControlFlow::<(), R>::Break(())
+                },
+                ControlFlow::Ret(_) => todo!(),
+                ControlFlow::Continue => todo!(),
+                ControlFlow::Preempt => ControlFlow::Preempt,
+            };
+
+            ctx.builder().switch_to_block(else_block);
+            ctx.builder().seal_block(else_block);
+            flow
+        });
+
+        let else_val = (self.alt)(&C);
+        
+        with_ctx(|ctx| {
+            let else_flow = match else_val {
+                ControlFlow::Break(else_val) => {
+                    <Val<B>>::jump_to(else_val, ctx, merge_block);
+                    ControlFlow::<_, R>::Break(())
+                },
+                ControlFlow::Ret(_) => todo!(),
+                ControlFlow::Continue => todo!(),
+                ControlFlow::Preempt => ControlFlow::Preempt,
+            };
+        
+            let b = ctx.builder();
+            b.switch_to_block(merge_block);
+            b.seal_block(merge_block);
+
+            match (then_flow, else_flow) {
+                // If wither branch can return a value, then we break that value
+                (ControlFlow::Break(_), _) | (_, ControlFlow::Break(_)) => {
+                    ControlFlow::Break(<Val<B>>::read_from_ret(ctx, merge_block))
+                }
+                (ControlFlow::Ret(_), _) | (_, ControlFlow::Ret(_)) => unreachable!(),
+                (ControlFlow::Preempt, _) | (_, ControlFlow::Preempt) => ControlFlow::Preempt,
+                (ControlFlow::Continue, ControlFlow::Continue) => todo!(),
+            }
+        })
     }
 }
-
-        // let [then_block, else_block, merge_block] = with_ctx(make_cond_blocks::<Val<O>>);
-        //
-        // let cond_val = (self)();
-        //
-        // with_ctx(|ctx| {
-        //     let b = ctx.builder();
-        //     b.ins().brif(cond_val.value(), then_block, &[], else_block, &[]);
-        //     b.switch_to_block(then_block);
-        //     b.seal_block(then_block);
-        // });
-        //
-        // let then_val = then.eval();
-        //
-        // with_ctx(|ctx| {
-        //     let then_val = then_val.as_val(ctx);
-        //     <Val<O>>::jump_to(then_val, ctx, merge_block);
-        //
-        //     ctx.builder().switch_to_block(else_block);
-        //     ctx.builder().seal_block(else_block);
-        // });
-        //
-        // let else_val = alt.eval();
-        //
-        // with_ctx(|ctx| {
-        //     let else_val = else_val.as_val(ctx);
-        //     <Val<O>>::jump_to(else_val, ctx, merge_block);
-        //
-        //     let b = ctx.builder();
-        //     b.switch_to_block(merge_block);
-        //     b.seal_block(merge_block);
-        //     <Val<O>>::read_from_ret(ctx, merge_block)
-        // })
-        //

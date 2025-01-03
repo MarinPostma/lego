@@ -7,6 +7,7 @@ use cranelift_frontend::{FunctionBuilder, Variable};
 use cranelift_jit::JITModule;
 use cranelift_module::{FuncId, Module};
 
+use crate::prelude::ControlFlow;
 use crate::{for_all_primitives, for_all_tuples, maybe_paren};
 use crate::primitive::ToPrimitive;
 use crate::abi_params::ToAbiParams;
@@ -138,7 +139,7 @@ where
     R: Results,
 {
     pub(crate) fn new<B>(ctx: &mut Ctx, body: B) -> Self
-    where B: FnOnce(P::Values) -> R::Results,
+    where B: FnOnce(P::Values) -> ControlFlow::<(), R::Results>,
     {
         P::to_abi_params(&mut ctx.ctx.func.signature.params);
         R::to_abi_params(&mut ctx.ctx.func.signature.returns);
@@ -162,7 +163,14 @@ where
             body(params)
         });
 
-        R::return_(&mut fn_ctx, ret);
+        match ret {
+            ControlFlow::Break(_) => unreachable!(),
+            ControlFlow::Ret(ret) => {
+                ret.return_(&mut fn_ctx);
+            },
+            ControlFlow::Continue => todo!(),
+            ControlFlow::Preempt => todo!(),
+        }
 
         fn_ctx.builder.finalize();
 
@@ -384,41 +392,40 @@ macro_rules! impl_params_tuples {
 
 for_all_tuples!(impl_params_tuples);
 
-pub trait FromFuncRet {
+pub trait FuncRet {
     fn from_func_ret(vals: &[Value]) -> Self;
+    fn return_(self, ctx: &mut FnCtx);
 }
 
-impl<T> FromFuncRet for Val<T> {
+impl<T> FuncRet for Val<T> {
     fn from_func_ret(vals: &[Value]) -> Self {
         assert_eq!(vals.len(), 1);
         Val::from_value(vals[0]) 
     }
+
+    fn return_(self, ctx: &mut FnCtx) {
+        ctx.builder.ins().return_(&[self.value()]);
+    }
 }
 
-impl FromFuncRet for () {
+impl FuncRet for () {
     fn from_func_ret(vals: &[Value]) -> Self {
         assert!(vals.is_empty());
+    }
+
+    fn return_(self, ctx: &mut FnCtx) {
+        ctx.builder.ins().return_(&[]);
     }
 }
 
 pub trait Results: ToAbiParams {
-    type Results: FromFuncRet;
-
-    fn return_(ctx: &mut FnCtx, results: Self::Results);
+    type Results: FuncRet;
 }
 
 impl<T: ToPrimitive + ToAbiParams> Results for T {
     type Results = Val<T>;
-
-    fn return_(ctx: &mut FnCtx, results: Self::Results) {
-        ctx.builder.ins().return_(&[results.value()]);
-    }
 }
 
 impl Results for () {
     type Results = ();
-
-    fn return_(ctx: &mut FnCtx, _results: Self::Results) {
-        ctx.builder.ins().return_(&[]);
-    }
 }
