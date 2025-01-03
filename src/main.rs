@@ -10,14 +10,14 @@ fn main() {
     let before = Instant::now();
 
     let main = ctx.func::<(&&str, &&str), ()>(|(_s1, _s2)| {
-        lego_macros::lego!({
-            if Val::new(true) {
-                println!("hello1");
-                1i32
-            } else {
-                println!("!hello");
-                1i32
+        lego!({
+            if true {
+                if true {
+                    return
+                }
             }
+
+            println!("hello");
         });
     });
     dbg!(before.elapsed());

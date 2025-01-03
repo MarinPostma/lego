@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote, ToTokens};
-use syn::{parse_macro_input, Attribute, Block, DataStruct, DeriveInput, ExprIf, ExprWhile, Ident, Type, Visibility};
-use syn::visit_mut::VisitMut;
+use syn::{parse_macro_input, Attribute, Block, DataStruct, DeriveInput, Expr, ExprIf, ExprWhile, Ident, Type, Visibility};
+use syn::visit_mut::{visit_expr_mut, VisitMut};
 use syn::parse::Parse;
 
 struct LegoIfThenElse {
@@ -61,46 +61,92 @@ impl ToTokens for LegoWhile {
 }
 
 struct RewriteVisitor {
-    in_if: bool,
+    if_depth: usize,
 }
 
 impl RewriteVisitor {
     fn new() -> Self {
-        Self { in_if: false }
+        Self { if_depth: 0 }
+    }
+}
+
+fn handle_control_flow(input: impl ToTokens) -> impl ToTokens {
+    quote! {
+        match #input {
+            lego::prelude::ControlFlow::Continue => (),
+            e => return e,
+        }
     }
 }
 
 impl VisitMut for RewriteVisitor {
-    fn visit_expr_return_mut(&mut self, _i: &mut syn::ExprReturn) {
-        if self.in_if {
-            panic!("can't have return yet")
+    fn visit_expr_return_mut(&mut self, _: &mut syn::ExprReturn) {
+        unreachable!("return should be handled")
+    }
+
+    fn visit_expr_mut(&mut self, e: &mut syn::Expr) {
+        match e {
+            Expr::Return(ret) => {
+                if let Some(ref mut e) = ret.expr {
+                    self.visit_expr_mut(e);
+                }
+
+                if self.if_depth != 0 {
+                    let ret_e = match ret.expr {
+                        Some(ref e) => quote! { #e },
+                        None => quote! { () },
+                    };
+                    let handle_cflow = handle_control_flow(quote!{ __ctx__.ret(#ret_e) });
+                    let new_ret = quote! {
+                        #handle_cflow
+                    };
+                    *e = syn::parse::<Expr>(new_ret.into()).unwrap();
+                }
+            },
+            e => visit_expr_mut(self, e),
         }
     }
 
+    fn visit_expr_closure_mut(&mut self, _i: &mut syn::ExprClosure) {
+        panic!("can define closure in if yet");
+    }
+
     fn visit_expr_if_mut(&mut self, i: &mut syn::ExprIf) {
-        self.in_if = true;
+        self.if_depth += 1;
         self.visit_expr_mut(&mut i.cond);
         self.visit_block_mut(&mut i.then_branch);
         if let Some((_, ref mut else_branch)) = i.else_branch {
             self.visit_expr_mut(else_branch);
         }
-        self.in_if = false;
 
         let cond = &i.cond;
         let then = &i.then_branch;
         let alt = if let Some((_, ref e)) = i.else_branch {
-            quote! {
-                lego::prelude::Else(|| #e)
-            }
+            quote! { #e }
         } else {
-            quote! {
-                lego::prelude::Else(lego::prelude::Never)
-            }
+            quote! { () }
+        };
+
+        self.if_depth -= 1;
+
+        let control_flow_ret = if self.if_depth != 0 {
+            quote! { return lego::prelude::ControlFlow::Ret(v) }
+        } else {
+            quote! { return v }
         };
 
         let new = quote! {
             if true {
-                (|| #cond).eval(lego::prelude::Then(|| #then), #alt)
+                let r = lego::prelude::If3::new(
+                    || #cond,
+                    |__ctx__| lego::prelude::ControlFlow::Break(#then),
+                    |__ctx__| lego::prelude::ControlFlow::Break(#alt),
+                ).eval();
+                match r {
+                    lego::prelude::ControlFlow::Continue => unreachable!(),
+                    lego::prelude::ControlFlow::Break(v) => v,
+                    lego::prelude::ControlFlow::Ret(v) => #control_flow_ret,
+                }
             } else {
                 unreachable!()
             }
