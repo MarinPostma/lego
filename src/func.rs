@@ -139,7 +139,7 @@ where
     R: Results,
 {
     pub(crate) fn new<B>(ctx: &mut Ctx, body: B) -> Self
-    where B: FnOnce(P::Values) -> ControlFlow::<(), R::Results>,
+    where B: FnOnce(P::Values) -> ControlFlow::<R::Results, R::Results>,
     {
         P::to_abi_params(&mut ctx.ctx.func.signature.params);
         R::to_abi_params(&mut ctx.ctx.func.signature.returns);
@@ -164,7 +164,9 @@ where
         });
 
         match ret {
-            ControlFlow::Break(_) => unreachable!(),
+            ControlFlow::Break(ret) => {
+                ret.return_(&mut fn_ctx);
+            },
             ControlFlow::Ret(ret) => {
                 ret.return_(&mut fn_ctx);
             },

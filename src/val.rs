@@ -39,6 +39,12 @@ impl<T> Val<T> {
 pub trait AsVal {
     type Ty;
 
+    fn value(&self) -> Val<Self::Ty> {
+        with_ctx(|ctx| {
+            self.as_val(ctx)
+        })
+    }
+
     fn as_val(&self, ctx: &mut FnCtx) -> Val<Self::Ty>;
 }
 

@@ -90,7 +90,7 @@ impl Ctx {
         Self::builder().build()
     }
 
-    pub fn func<P, R>(&mut self, body: impl FnOnce(P::Values) -> ControlFlow<(), R::Results>) -> Func<P, R>
+    pub fn func<P, R>(&mut self, body: impl FnOnce(P::Values) -> ControlFlow<R::Results, R::Results>) -> Func<P, R>
     where
         P: Params,
         R: Results,

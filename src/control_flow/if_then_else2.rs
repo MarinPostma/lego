@@ -130,7 +130,10 @@ where
                     B::jump_to(val, ctx, merge_block);
                     ControlFlow::<(), R>::Break(())
                 },
-                ControlFlow::Ret(_) => todo!(),
+                ControlFlow::Ret(v) => {
+                    v.return_(ctx);
+                    ControlFlow::Preempt
+                },
                 ControlFlow::Continue => todo!(),
                 ControlFlow::Preempt => ControlFlow::Preempt,
             };

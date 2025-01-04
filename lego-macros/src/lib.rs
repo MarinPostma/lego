@@ -132,7 +132,9 @@ impl VisitMut for RewriteVisitor {
 pub fn lego(input: TokenStream) -> TokenStream {
     let mut input = parse_macro_input!(input as Block);
     RewriteVisitor::new().visit_block_mut(&mut input);
-    quote! { #input }.into()
+    quote! {
+        lego::prelude::ControlFlow::Break(#input)
+    }.into()
 }
 
 #[proc_macro_derive(LegoBlock)]

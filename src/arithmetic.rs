@@ -12,7 +12,7 @@ use crate::val::{Val, AsVal};
 macro_rules! make_arithmetic_traits {
     ($($name:ident $(,)?)*) => {
         $(
-            pub(crate) trait $name: ToPrimitive {
+            pub trait $name: ToPrimitive {
                 fn perform(ctx: &mut FnCtx, lhs: Value, rhs: Value) -> Value;
             }
         )*
