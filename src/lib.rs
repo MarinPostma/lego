@@ -20,6 +20,8 @@ pub mod prelude {
     pub use crate::val::Val;
     pub use crate::var::Var;
 
+    pub use crate::control_flow::while2::{do_while, WhileCtx};
+
     pub use crate::proxy::{Proxy, ProxyMut};
 
     pub use crate::refs::JitSafe;

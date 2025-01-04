@@ -1,64 +1,7 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote, ToTokens};
-use syn::{parse_macro_input, Attribute, Block, DataStruct, DeriveInput, Expr, ExprIf, ExprWhile, Ident, Type, Visibility};
-use syn::visit_mut::{visit_expr_mut, VisitMut};
-use syn::parse::Parse;
-
-struct LegoIfThenElse {
-    i: ExprIf,
-}
-
-impl Parse for LegoIfThenElse {
-    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let i = input.parse::<ExprIf>()?;
-        Ok(Self { i })
-    }
-}
-
-impl ToTokens for LegoIfThenElse {
-    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let cond = &self.i.cond;
-        let then_branch = &self.i.then_branch;
-        match &self.i.else_branch {
-            Some((_, else_branch)) => {
-                quote! {
-                    lego::prelude::If::new(|| #cond)
-                        .then(lego::prelude::Then(|| #then_branch))
-                        .alt(lego::prelude::Else(|| #else_branch))
-                }.to_tokens(tokens);
-            }
-            None => {
-                quote! {
-                    lego::prelude::If::new(|| #cond)
-                        .then(lego::prelude::Then(|| #then_branch))
-                        .finish()
-                }.to_tokens(tokens);
-            }
-        }
-    }
-}
-
-struct LegoWhile {
-    w: ExprWhile,
-}
-
-impl Parse for LegoWhile {
-    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let w = input.parse::<ExprWhile>()?;
-        Ok(Self { w })
-    }
-}
-
-impl ToTokens for LegoWhile {
-    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let cond = &self.w.cond;
-        let body = &self.w.body;
-        quote! {
-            lego::prelude::While::new(|| #cond)
-                .body(lego::prelude::Body(|| #body))
-        }.to_tokens(tokens);
-    }
-}
+use syn::{parse_macro_input, Attribute, Block, DataStruct, DeriveInput, Expr, Ident, Type, Visibility};
+use syn::visit_mut::{visit_block_mut, visit_expr_mut, VisitMut};
 
 struct RewriteVisitor {
     if_depth: usize,
@@ -125,6 +68,12 @@ impl VisitMut for RewriteVisitor {
 
                 *e = syn::parse::<Expr>(new).unwrap();
             }
+            Expr::Break(_) => {
+                panic!("break not supported")
+            }
+            Expr::Continue(_ ) => {
+                panic!("continue not supported")
+            }
             Expr::Return(ret) => {
                 if let Some(ref mut e) = ret.expr {
                     self.visit_expr_mut(e);
@@ -141,6 +90,30 @@ impl VisitMut for RewriteVisitor {
                     };
                     *e = syn::parse::<Expr>(new_ret.into()).unwrap();
                 }
+            },
+            Expr::While(while_expr) => {
+                visit_expr_mut(self, &mut while_expr.cond);
+                visit_block_mut(self, &mut while_expr.body);
+                let cond = &while_expr.cond;
+                let body = &while_expr.body;
+                let new_while = quote! {
+                    {
+                        let ret = lego::prelude::do_while(|__ctx__| {
+                            while __ctx__.cond(|| #cond) {
+                                #body
+                            }
+
+                            lego::prelude::ControlFlow::Break(())
+                        });
+                        match ret {
+                            lego::prelude::ControlFlow::Break(()) => (),
+                            lego::prelude::ControlFlow::Ret(v) => return lego::prelude::ControlFlow::Ret(v),
+                            lego::prelude::ControlFlow::Continue => todo!(),
+                            lego::prelude::ControlFlow::Preempt => return lego::prelude::ControlFlow::Preempt,
+                        }
+                    }
+                };
+                *e = syn::parse(new_while.into()).unwrap();
             },
             e => visit_expr_mut(self, e),
         }

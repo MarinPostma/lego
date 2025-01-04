@@ -1,6 +1,7 @@
 use cranelift::prelude::{Block, InstBuilder as _};
 
-use crate::{func::{with_ctx, FnCtx}, val::{AsVal, Val}};
+use crate::val::{AsVal, Val};
+use crate::func::{with_ctx, FnCtx};
 
 use super::{BlockRet, Branch};
 

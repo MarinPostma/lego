@@ -3,7 +3,6 @@ use std::cell::RefCell;
 use std::mem::MaybeUninit;
 
 use cranelift::prelude::{Block, InstBuilder, Value};
-use cranelift_codegen::control::ControlPlane;
 use cranelift_frontend::{FunctionBuilder, Variable};
 use cranelift_jit::JITModule;
 use cranelift_module::{FuncId, Module};
