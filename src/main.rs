@@ -1,5 +1,3 @@
-use std::ops::Mul;
-
 use lego::prelude::*;
 
 fn main() {
@@ -12,7 +10,6 @@ fn main() {
     fn pow<T>(val: T, to: usize) -> impl AsVal<Ty = T::Ty>
     where
         T: AsVal,
-        T::Ty: Mul,
         T::Ty: ToPrimitive + IntMul,
     {
         let v = val.value();
@@ -53,6 +50,8 @@ fn main() {
             pow(val, 3).value()
         })
     });
+
+    ctx.disas(main);
 
     let main = ctx.get_compiled_function(main);
 
