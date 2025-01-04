@@ -5,7 +5,7 @@ use cranelift::prelude::Configurable as _;
 use cranelift_codegen::settings;
 use cranelift_frontend::FunctionBuilderContext;
 use cranelift_jit::{JITBuilder, JITModule};
-use cranelift_module::Module as _;
+use cranelift_module::Module;
 
 use crate::{func::{CompiledFunc, Func, Params, Results}, prelude::ControlFlow};
 
@@ -68,9 +68,11 @@ impl CtxBuilder {
 
         let module = JITModule::new(builder);
 
+        let ctx = module.make_context();
+        // ctx.want_disasm = true;
         Ctx {
             fn_builder_ctx: FunctionBuilderContext::new(),
-            ctx: module.make_context(),
+            ctx,
             module,
         }
 

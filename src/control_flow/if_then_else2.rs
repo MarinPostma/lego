@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use cranelift::prelude::{Block, InstBuilder as _};
 
 use crate::func::{with_ctx, FnCtx, FuncRet};
-use crate::val::{Val};
+use crate::val::Val;
 
 use super::BlockRet;
 
@@ -55,11 +55,11 @@ pub trait Ctx<B, R> {
     fn ret(&self, r: R) -> ControlFlow<B, R>;
 }
 
-pub trait Cond<B, R> {
+pub trait FlowControl<B, R> {
     fn eval(&mut self) -> ControlFlow<B, R>;
 }
 
-impl<C, B, R, T, A> Cond<B, R> for If3<C, bool, B, R, T, A>
+impl<C, B, R, T, A> FlowControl<B, R> for If3<C, bool, B, R, T, A>
 where
     C: FnMut() -> bool,
     T: FnMut(&dyn Ctx<B, R>) -> ControlFlow<B, R>,
@@ -87,7 +87,7 @@ fn make_cond_blocks<T: BlockRet>(ctx: &mut FnCtx) -> [Block; 3] {
     [then_block, else_block, merge_block]
 }
 
-impl<C, B, R, T, A> Cond<B, R> for If3<C, Val<bool>, B, R, T, A>
+impl<C, B, R, T, A> FlowControl<B, R> for If3<C, Val<bool>, B, R, T, A>
 where
     C: FnMut() -> Val<bool>,
     T: FnMut(&dyn Ctx<B, R>) -> ControlFlow<B, R>,

@@ -3,6 +3,7 @@ use std::cell::RefCell;
 use std::mem::MaybeUninit;
 
 use cranelift::prelude::{Block, InstBuilder, Value};
+use cranelift_codegen::control::ControlPlane;
 use cranelift_frontend::{FunctionBuilder, Variable};
 use cranelift_jit::JITModule;
 use cranelift_module::{FuncId, Module};
@@ -175,9 +176,11 @@ where
         fn_ctx.builder.finalize();
 
         let func_id = ctx.module.declare_anonymous_function(&ctx.ctx.func.signature).unwrap();
+
         ctx.module.define_function(func_id, &mut ctx.ctx).unwrap();
         ctx.module.clear_context(&mut ctx.ctx);
         ctx.module.finalize_definitions().unwrap();
+
 
         Self {
             _pth: PhantomData,

@@ -7,6 +7,7 @@ use crate::func::FnCtx;
 pub mod while_loop;
 pub mod if_then_else;
 pub mod if_then_else2;
+pub mod while2;
 
 /// Something the returns a Val<bool> that can be used in a comparison
 pub trait Cond {
