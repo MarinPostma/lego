@@ -10,7 +10,7 @@ fn main() {
     fn pow<T>(val: T, to: usize) -> impl AsVal<Ty = T::Ty>
     where
         T: AsVal,
-        T::Ty: ToPrimitive + IntMul,
+        T::Ty: IntMul,
     {
         let v = val.value();
         let mut x = Var::new(val);
