@@ -30,14 +30,11 @@ pub struct CompiledFunc<'a, P, R> {
     pub(crate) _pth: PhantomData<&'a fn(P) -> R>,
 }
 
-impl<P, R> Call for CompiledFunc<'_, P, R>
+impl<P, R> Call<P, R> for CompiledFunc<'_, P, R>
 where
     P: Param,
 {
-    type Input = P;
-    type Output = R;
-
-    fn call(&self, input: Self::Input) -> Self::Output {
+    fn fn_call(self, input: P) -> R {
         let f = unsafe {
             std::mem::transmute::<*const u8, fn(P) -> R>(self.ptr)
         };
@@ -46,24 +43,15 @@ where
     }
 }
 
-impl<A, B, R> Call for CompiledFunc<'_, (A, B), R> {
-    type Input = (A, B);
-    type Output = R;
+impl<A, B, R> Call<(A, B), R> for CompiledFunc<'_, (A, B), R> {
 
-    fn call(&self, (a, b): Self::Input) -> Self::Output {
+    fn fn_call(self, (a, b): (A, B)) -> R {
         let f = unsafe {
             std::mem::transmute::<*const u8, fn(A, B) -> R>(self.ptr)
         };
 
         f(a, b)
     }
-}
-
-pub trait Call {
-    type Input;
-    type Output;
-
-    fn call(&self, input: Self::Input) -> Self::Output;
 }
 
 pub struct FnCtx<'a> {
@@ -214,6 +202,7 @@ pub trait HostFn {
     fn emit_call(&self, ctx: &mut FnCtx, params: impl IntoParams<Input = Self::Params>) -> <Self::Returns as Results>::Results;
 }
 
+#[derive(Debug, Copy, Clone)]
 pub struct HostFunc<F, P, R>(F, PhantomData<fn(P) -> R>);
 
 impl<F, P, R> HostFunc<F, P, R> 
@@ -432,4 +421,45 @@ impl<T: ToPrimitive + ToAbiParams> Results for T {
 
 impl Results for () {
     type Results = ();
+}
+
+pub trait Call<I, O> {
+    fn fn_call(self, input: I) -> O;
+}
+
+impl<F, A, O> Call<(A,), O> for F
+    where
+    F: FnMut(A) -> O,
+{
+    fn fn_call(mut self, (input,): (A,)) -> O {
+        (self)(input)
+    }
+}
+
+impl<F, A, B, O> Call<(A, B), O> for F
+    where
+    F: FnMut(A, B) -> O,
+{
+    fn fn_call(mut self, (a, b): (A, B)) -> O {
+        (self)(a, b)
+    }
+}
+
+impl<F, O> Call<(), O> for F
+    where
+    F: FnMut() -> O,
+{
+    fn fn_call(mut self, _: ()) -> O {
+        (self)()
+    }
+}
+
+impl<F, P, O, I> Call<I, <<Self as HostFn>::Returns as Results>::Results> for HostFunc<F, P, O>
+    where
+        Self: HostFn,
+        I: IntoParams<Input = <Self as HostFn>::Params>,
+{
+    fn fn_call(self, p: I) -> <<Self as HostFn>::Returns as Results>::Results {
+        self.call(p)
+    }
 }

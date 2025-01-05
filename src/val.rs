@@ -62,6 +62,14 @@ macro_rules! impl_into_var_primitive {
     };
 }
 
+impl<A: AsVal> AsVal for (A,) {
+    type Ty = A::Ty;
+
+    fn as_val(&self, ctx: &mut FnCtx) -> Val<Self::Ty> {
+        self.0.as_val(ctx)
+    }
+}
+
 impl_into_var_primitive! {
     u8, u16, u32, u64,
     i8, i16, i32, i64,

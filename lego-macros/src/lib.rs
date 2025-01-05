@@ -29,8 +29,52 @@ impl VisitMut for RewriteVisitor {
         unreachable!("return should be handled")
     }
 
+    // fn visit_expr_binary_mut(&mut self, _i: &mut syn::ExprBinary) {
+    //     unreachable!("binop should be rewritten");
+    // }
+
     fn visit_expr_mut(&mut self, e: &mut syn::Expr) {
         match e {
+            // conflict in implementation for integers.
+            // When doing 1 + 1 for example, what should be the output?
+            // This should emit a bool: we can evaluate this expression at compile time.
+            // This can be solved with a new trait
+            // Expr::Binary(i) => {
+            //
+            //     visit_expr_mut(self, &mut i.left);
+            //     visit_expr_mut(self, &mut i.right);
+            //
+            //     let new_e = match i.op {
+            //         syn::BinOp::Eq(_) => {
+            //             let lhs = &i.left;
+            //             let rhs = &i.right;
+            //             quote! {
+            //                 #lhs.eq(&#rhs)
+            //             }
+            //         },
+            //         syn::BinOp::Lt(_) => todo!(),
+            //         syn::BinOp::Le(_) => todo!(),
+            //         syn::BinOp::Ne(_) => todo!(),
+            //         syn::BinOp::Ge(_) => todo!(),
+            //         syn::BinOp::Gt(_) => todo!(),
+            //         _ => return,
+            //     };
+            //
+            //     *e = syn::parse(new_e.into()).unwrap();
+            //
+            // }
+            Expr::Call(call) => {
+                visit_expr_mut(self, &mut call.func);
+                call.args.iter_mut().for_each(|arg| visit_expr_mut(self, arg));
+
+                let callee = &call.func;
+                let params = call.args.iter();
+                let new_call = quote! {
+                    #callee.fn_call((#(#params,)*))
+                };
+
+                *e = syn::parse(new_call.into()).unwrap();
+            }
             Expr::If(i) => {
                 self.if_depth += 1;
                 self.visit_expr_mut(&mut i.cond);

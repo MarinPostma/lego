@@ -35,26 +35,29 @@ fn main() {
                         if arg == 5 { // <- this is partially evaluated during function building
                             return val + 0;
                         } else {
-                            say_hello_winner.call(i);
+                            say_hello_winner(i);
                         }
                     } else if (i % 2).eq(&0) { // <- emit if/else
-                        say_hello_even.call(i);
+                        say_hello_even(i);
                     } else {
-                        say_hello_odd.call(i);
+                        say_hello_odd(i);
                     }
                     i += 1;
                 }
             }
+            
 
+            say_hello_odd(val);
             // loop unwinded implementation of pow3
-            pow(val, 3).value()
+            // pow(val, 3).value()
+            val.value()
         })
     });
 
-    ctx.disas(main);
+    // ctx.disas(main);
 
     let main = ctx.get_compiled_function(main);
 
     dbg!();
-    dbg!(main.call(10));
+    dbg!(main.fn_call(2));
 }
