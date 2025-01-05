@@ -4,23 +4,8 @@ use crate::primitive::ToPrimitive;
 use crate::val::Val;
 use crate::func::FnCtx;
 
-pub mod while_loop;
 pub mod if_then_else;
-pub mod if_then_else2;
-pub mod while2;
-
-/// Something the returns a Val<bool> that can be used in a comparison
-pub trait Cond {
-    fn eval(self) -> Val<bool>;
-}
-
-impl<C> Cond for C
-    where C: FnOnce() -> Val<bool>
-{
-    fn eval(self) -> Val<bool> {
-        (self)()
-    }
-}
+pub mod while_loop;
 
 pub trait BlockRet {
     /// push param ty for the passed block
@@ -51,10 +36,3 @@ impl<T: ToPrimitive> BlockRet for Val<T> {
         Val::from_value(ctx.builder().block_params(block)[0])
     }
 }
-
-pub trait Branch {
-    type Output;
-
-    fn eval(self) -> Self::Output;
-}
-

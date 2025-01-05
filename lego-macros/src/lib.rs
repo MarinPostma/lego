@@ -96,7 +96,7 @@ impl VisitMut for RewriteVisitor {
                 let new = quote! {
                     {
                         #[allow(unreachable_code)]
-                        let r = lego::prelude::If3::new(
+                        let r = lego::prelude::If::new(
                             || #cond,
                             |__ctx__| lego::prelude::ControlFlow::Break(#then),
                             |__ctx__| lego::prelude::ControlFlow::Break(#alt),

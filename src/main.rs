@@ -46,11 +46,9 @@ fn main() {
                 }
             }
             
-
             say_hello_odd(val);
             // loop unwinded implementation of pow3
-            // pow(val, 3).value()
-            val.value()
+            pow(val, 3).value()
         })
     });
 
