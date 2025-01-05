@@ -51,7 +51,8 @@ impl CtxBuilder {
         let mut flag_builder = settings::builder();
         flag_builder.set("use_colocated_libcalls", "false").unwrap();
         flag_builder.set("is_pic", "false").unwrap();
-        // flag_builder.set("opt_level", "none").unwrap();
+        // flag_builder.set("opt_level", "speed").unwrap();
+        flag_builder.set("opt_level", "none").unwrap();
         let isa_builder = cranelift_native::builder().unwrap_or_else(|msg| {
             panic!("host machine is not supported: {}", msg);
         });
@@ -164,9 +165,10 @@ impl Ctx {
     pub fn disas<P, R>(&self, f: Func<P, R>) {
         let bytes = self.module.get_finalized_function_bytes(f.id());
         let code = unsafe { std::mem::transmute::<&[u8], &[u32]>(bytes) };
+        dbg!(code.len());
         for ins in code {
-            let insn = disarm64::decoder::decode(0x11000000).unwrap();
-            println!(insn);
+            let insn = disarm64::decoder::decode(*ins).unwrap();
+            println!("{insn}");
         }
     }
 
