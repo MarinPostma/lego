@@ -13,7 +13,7 @@ mod abi_params;
 mod compare;
 
 pub mod prelude {
-    pub use crate::control_flow::if_then_else::{If, FlowControl as Cond2, ControlFlow, Ctx as Ctx2};
+    pub use crate::control_flow::if_then_else::{If, FlowControl, ControlFlow, IfCtx};
     pub use crate::compare::Compare;
     pub use crate::val::{Val, AsVal};
     pub use crate::var::Var;

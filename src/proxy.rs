@@ -1,11 +1,8 @@
-// use std::collections::HashMap;
-// use std::hash::Hash;
 use std::marker::PhantomData;
 use std::ops::Deref;
 
 use cranelift::prelude::{InstBuilder as _, MemFlags};
 use cranelift::prelude::*;
-// use cranelift_module::Module;
 
 use crate::func::{with_ctx, FnCtx};
 use crate::primitive::ToPrimitive;

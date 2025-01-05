@@ -23,8 +23,8 @@ pub struct If<
     Test,
     B,
     R,
-    T: FnMut(&dyn Ctx<B, R>) -> ControlFlow<B, R>,
-    A: FnMut(&dyn Ctx<B, R>) -> ControlFlow<B, R>,
+    T: FnMut(&dyn IfCtx<B, R>) -> ControlFlow<B, R>,
+    A: FnMut(&dyn IfCtx<B, R>) -> ControlFlow<B, R>,
 > {
     cond: C,
     then: T,
@@ -37,8 +37,8 @@ impl<
         Test,
         B,
         R,
-        T: FnMut(&dyn Ctx<B, R>) -> ControlFlow<B, R>,
-        A: FnMut(&dyn Ctx<B, R>) -> ControlFlow<B, R>,
+        T: FnMut(&dyn IfCtx<B, R>) -> ControlFlow<B, R>,
+        A: FnMut(&dyn IfCtx<B, R>) -> ControlFlow<B, R>,
     > If<C, Test, B, R, T, A>
 {
     pub fn new(cond: C, then: T, alt: A) -> Self {
@@ -51,7 +51,7 @@ impl<
     }
 }
 
-pub trait Ctx<B, R> {
+pub trait IfCtx<B, R> {
     fn ret(&self, r: R) -> ControlFlow<B, R>;
 }
 
@@ -62,12 +62,12 @@ pub trait FlowControl<B, R> {
 impl<C, B, R, T, A> FlowControl<B, R> for If<C, bool, B, R, T, A>
 where
     C: FnMut() -> bool,
-    T: FnMut(&dyn Ctx<B, R>) -> ControlFlow<B, R>,
-    A: FnMut(&dyn Ctx<B, R>) -> ControlFlow<B, R>,
+    T: FnMut(&dyn IfCtx<B, R>) -> ControlFlow<B, R>,
+    A: FnMut(&dyn IfCtx<B, R>) -> ControlFlow<B, R>,
 {
     fn eval(&mut self) -> ControlFlow<B, R> {
         struct C;
-        impl<B, R> Ctx<B, R> for C {
+        impl<B, R> IfCtx<B, R> for C {
             fn ret(&self, r: R) -> ControlFlow<B, R> {
                 ControlFlow::Ret(r)
             }
@@ -90,8 +90,8 @@ fn make_cond_blocks<T: BlockRet>(ctx: &mut FnCtx) -> [Block; 3] {
 impl<C, B, R, T, A> FlowControl<B, R> for If<C, Val<bool>, B, R, T, A>
 where
     C: FnMut() -> Val<bool>,
-    T: FnMut(&dyn Ctx<B, R>) -> ControlFlow<B, R>,
-    A: FnMut(&dyn Ctx<B, R>) -> ControlFlow<B, R>,
+    T: FnMut(&dyn IfCtx<B, R>) -> ControlFlow<B, R>,
+    A: FnMut(&dyn IfCtx<B, R>) -> ControlFlow<B, R>,
     B: BlockRet,
     R: FuncRet,
 {
@@ -109,7 +109,7 @@ where
         });
 
         struct C;
-        impl<B, R> Ctx<B, R> for C
+        impl<B, R> IfCtx<B, R> for C
             where R: FuncRet
         {
             fn ret(&self, r: R) -> ControlFlow<B, R> {
