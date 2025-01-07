@@ -40,8 +40,9 @@ impl ToPrimitive for bool {
     }
 }
 
+
 macro_rules! primitive_jit_ty {
-    ($($src:ident => $dst:ident $(,)?)*) => {
+    ($($src:ident $(,)?)*) => {
         $(
             impl ToPrimitive for $src {
                 fn to_i64(self) -> i64 {
@@ -50,7 +51,7 @@ macro_rules! primitive_jit_ty {
                 }
 
                 fn ty() -> Type {
-                    $dst
+                    Type::int_with_byte_size(std::mem::size_of::<Self>() as u16).unwrap()
                 }
             }
         )*
@@ -58,12 +59,14 @@ macro_rules! primitive_jit_ty {
 }
 
 primitive_jit_ty! {
-    u8 => I8,
-    i8 => I8,
-    u16 => I16,
-    i16 => I16,
-    u32 => I32,
-    i32 => I32,
-    i64 => I64,
-    u64 => I64,
+    u8,
+    i8,
+    u16,
+    i16,
+    u32,
+    i32,
+    i64,
+    u64,
+    usize,
+    isize,
 }

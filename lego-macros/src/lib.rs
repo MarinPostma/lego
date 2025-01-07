@@ -96,17 +96,17 @@ impl VisitMut for RewriteVisitor {
                 let new = quote! {
                     {
                         #[allow(unreachable_code)]
-                        let r = lego::prelude::If::new(
+                        lego::prelude::If::new(
                             || #cond,
                             |__ctx__| lego::prelude::ControlFlow::Break(#then),
                             |__ctx__| lego::prelude::ControlFlow::Break(#alt),
-                        ).eval();
-                        match r {
-                            lego::prelude::ControlFlow::Continue => return lego::prelude::ControlFlow::Continue,
-                            lego::prelude::ControlFlow::Break(v) => v,
-                            lego::prelude::ControlFlow::Ret(v) => return lego::prelude::ControlFlow::Ret(v),
-                            lego::prelude::ControlFlow::Preempt => return lego::prelude::ControlFlow::Preempt,
-                        }
+                        ).eval()
+                        // match r {
+                        //     lego::prelude::ControlFlow::Continue => return lego::prelude::ControlFlow::Continue,
+                        //     lego::prelude::ControlFlow::Break(v) => v,
+                        //     lego::prelude::ControlFlow::Ret(v) => return lego::prelude::ControlFlow::Ret(v),
+                        //     lego::prelude::ControlFlow::Preempt => return lego::prelude::ControlFlow::Preempt,
+                        // }
                     }
                 }.into();
 
@@ -142,19 +142,19 @@ impl VisitMut for RewriteVisitor {
                 let body = &while_expr.body;
                 let new_while = quote! {
                     {
-                        let ret = lego::prelude::do_while(|__ctx__| {
+                        lego::prelude::do_while(|__ctx__| {
                             while __ctx__.cond(|| #cond) {
                                 #body
                             }
 
                             lego::prelude::ControlFlow::Break(())
-                        });
-                        match ret {
-                            lego::prelude::ControlFlow::Break(()) => (),
-                            lego::prelude::ControlFlow::Ret(v) => return lego::prelude::ControlFlow::Ret(v),
-                            lego::prelude::ControlFlow::Continue => todo!(),
-                            lego::prelude::ControlFlow::Preempt => return lego::prelude::ControlFlow::Preempt,
-                        }
+                        })
+                        // match ret {
+                        //     lego::prelude::ControlFlow::Break(()) => (),
+                        //     lego::prelude::ControlFlow::Ret(v) => return lego::prelude::ControlFlow::Ret(v),
+                        //     lego::prelude::ControlFlow::Continue => todo!(),
+                        //     lego::prelude::ControlFlow::Preempt => return lego::prelude::ControlFlow::Preempt,
+                        // }
                     }
                 };
                 *e = syn::parse(new_while.into()).unwrap();
@@ -177,7 +177,7 @@ pub fn lego(input: TokenStream) -> TokenStream {
     let mut input = parse_macro_input!(input as Block);
     RewriteVisitor::new().visit_block_mut(&mut input);
     quote! {
-        lego::prelude::ControlFlow::Break(#input)
+        #input
     }.into()
 }
 

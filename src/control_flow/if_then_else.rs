@@ -8,7 +8,7 @@ use crate::val::Val;
 use super::BlockRet;
 
 #[derive(Debug)]
-pub enum ControlFlow<B, R> {
+pub enum ControlFlow<B, R = ()> {
     Break(B),
     Ret(R),
     Continue,
@@ -16,6 +16,16 @@ pub enum ControlFlow<B, R> {
     /// yielding a value, when generating code. In this case, no jump to the merge block is
     /// emitted
     Preempt,
+}
+
+impl<B, R> ControlFlow<B, R> {
+    pub fn into_break(self) -> Option<B> {
+        if let Self::Break(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
 }
 
 pub struct If<

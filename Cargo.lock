@@ -462,6 +462,7 @@ dependencies = [
  "disarm64",
  "iced-x86",
  "lego-macros",
+ "paresse",
 ]
 
 [[package]]
@@ -517,6 +518,31 @@ checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
 dependencies = [
  "autocfg",
 ]
+
+[[package]]
+name = "paresse"
+version = "0.1.0"
+source = "git+https://github.com/MarinPostma/paresse.git#43ebb4a9b7c8c33db6747eea93de55733720ca85"
+dependencies = [
+ "paresse-codegen",
+ "paresse-core",
+]
+
+[[package]]
+name = "paresse-codegen"
+version = "0.1.0"
+source = "git+https://github.com/MarinPostma/paresse.git#43ebb4a9b7c8c33db6747eea93de55733720ca85"
+dependencies = [
+ "paresse-core",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "paresse-core"
+version = "0.1.0"
+source = "git+https://github.com/MarinPostma/paresse.git#43ebb4a9b7c8c33db6747eea93de55733720ca85"
 
 [[package]]
 name = "plain"

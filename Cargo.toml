@@ -28,3 +28,6 @@ members = [
 
 # [patch.crates-io]
 # cranelift-jit = { path = "../wasmtime/cranelift/jit" }
+
+[dev-dependencies]
+paresse = { git = "https://github.com/MarinPostma/paresse.git" }

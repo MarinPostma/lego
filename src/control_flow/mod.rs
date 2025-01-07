@@ -16,6 +16,7 @@ pub trait BlockRet {
 
 impl BlockRet for () {
     fn push_param_ty(_ctx: &mut FnCtx, _block: Block) { }
+
     fn jump_to(self, ctx: &mut FnCtx, block: Block) { 
         ctx.builder().ins().jump(block, &[]);
     }

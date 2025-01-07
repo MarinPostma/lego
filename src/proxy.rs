@@ -1,14 +1,14 @@
 use std::marker::PhantomData;
-use std::ops::Deref;
+use std::ops::{Deref, Index};
 
 use cranelift::prelude::{InstBuilder as _, MemFlags};
 use cranelift::prelude::*;
 
-use crate::func::{with_ctx, FnCtx};
+use crate::func::{with_ctx, FnCtx, Param};
 use crate::primitive::ToPrimitive;
 use crate::val::{AsVal, Val};
 
-impl<T: ToPrimitive> Proxy<T> {
+impl<T: ToPrimitive> Ref<T> {
     fn load(&self, ctx: &mut FnCtx) -> Val<T> {
         Val::from_value(ctx.builder.ins().load(T::ty(), MemFlags::new(), self.addr, self.offset))
     }
@@ -21,24 +21,24 @@ impl<T: ToPrimitive> Proxy<T> {
 }
 
 #[repr(transparent)]
-pub struct ProxyMut<T>(Proxy<T>);
+pub struct RefMut<T>(Ref<T>);
 
-impl<T> ProxyMut<T> {
+impl<T> RefMut<T> {
     #[doc(hidden)]
     pub fn new(addr: Value, offset: i32) -> Self {
-        Self(Proxy::new(addr, offset))
+        Self(Ref::new(addr, offset))
     }
 }
 
-impl<T> Deref for ProxyMut<T> {
-    type Target = Proxy<T>;
+impl<T> Deref for RefMut<T> {
+    type Target = Ref<T>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<T> ProxyMut<T> {
+impl<T> RefMut<T> {
     fn store(&mut self, ctx: &mut FnCtx, val: Value) {
         ctx.builder.ins().store(MemFlags::new(), val, self.addr, self.offset);
     }
@@ -52,13 +52,13 @@ impl<T> ProxyMut<T> {
 }
 
 #[derive(Clone, Copy)]
-pub struct Proxy<T> {
+pub struct Ref<T> {
     addr: Value,
     offset: i32,
     _pth: PhantomData<T>,
 }
 
-impl<T: ToPrimitive> AsVal for Proxy<T> {
+impl<T: ToPrimitive> AsVal for Ref<T> {
     type Ty = T;
 
     fn as_val(&self, ctx: &mut FnCtx) -> Val<Self::Ty> {
@@ -66,7 +66,7 @@ impl<T: ToPrimitive> AsVal for Proxy<T> {
     }
 }
 
-impl<T> Proxy<T> {
+impl<T> Ref<T> {
     #[doc(hidden)]
     pub fn addr(&self) -> Value {
         self.addr
@@ -83,7 +83,7 @@ impl<T> Proxy<T> {
     }
 }
 
-impl<'a, T> AsVal for &'a Proxy<T> {
+impl<'a, T> AsVal for &'a Ref<T> {
     type Ty = &'a T;
 
     fn as_val(&self, ctx: &mut FnCtx) -> Val<Self::Ty> {
@@ -96,12 +96,21 @@ impl<'a, T> AsVal for &'a Proxy<T> {
     }
 }
 
-impl<'a, T> AsVal for &'a mut ProxyMut<T> {
+impl<'a, T> AsVal for &'a mut RefMut<T> {
     type Ty = &'a mut T;
 
     fn as_val(&self, ctx: &mut FnCtx) -> Val<Self::Ty> {
         let p = &self.0;
         Val::from_value(p.as_val(ctx).value())
+    }
+}
+
+impl<T: Param> Index<Val<usize>> for Ref<&[T]> {
+    type Output = T::Ty;
+
+    fn index(&self, index: Val<usize>) -> &Self::Output {
+        with_ctx(|ctx| {
+        })
     }
 }
 

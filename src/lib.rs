@@ -10,25 +10,27 @@ mod control_flow;
 mod var;
 mod val;
 mod abi_params;
-mod compare;
+mod cmp;
 
 pub mod prelude {
     pub use crate::control_flow::if_then_else::{If, FlowControl, ControlFlow, IfCtx};
-    pub use crate::compare::Compare;
+    pub use crate::cmp::Compare;
     pub use crate::val::{Val, AsVal};
     pub use crate::var::Var;
 
     pub use crate::control_flow::while_loop::{do_while, WhileCtx};
     pub use crate::primitive::ToPrimitive;
+    pub use crate::abi_params::ToAbiParams;
 
-    pub use crate::proxy::{Proxy, ProxyMut};
+    pub use crate::proxy::{Ref, RefMut};
 
     pub use crate::refs::JitSafe;
     pub use crate::func::IntoHostFn;
     pub use crate::func::Call;
+    pub use crate::func::Param;
     pub use crate::ctx::Ctx;
 
-    pub use crate::arithmetic::IntMul;
+    pub use crate::arithmetic::*;
 
     pub use lego_macros::lego;
 }

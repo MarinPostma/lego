@@ -3,7 +3,7 @@ use cranelift::prelude::types::I64;
 use cranelift_module::Module;
 
 use crate::func::Param;
-use crate::proxy::{Proxy, ProxyMut};
+use crate::proxy::{Ref, RefMut};
 use crate::abi_params::ToAbiParams;
 
 /// Implented for types that can be shared with JIT
@@ -26,7 +26,7 @@ impl<T> ToAbiParams for &mut T {
 }
 
 impl<T> Param for &T {
-    type Ty = Proxy<T>;
+    type Ty = Ref<T>;
 
     fn initialize_param_at(ctx: &mut crate::func::FnCtx, idx: usize) -> Self::Ty {
         let variable = ctx.declare_var();
@@ -34,12 +34,12 @@ impl<T> Param for &T {
         ctx.builder.declare_var(variable, ctx.module.target_config().pointer_type());
         ctx.builder.def_var(variable, val);
 
-        Proxy::new(val, 0)
+        Ref::new(val, 0)
     }
 }
 
 impl<T> Param for &mut T {
-    type Ty = ProxyMut<T>;
+    type Ty = RefMut<T>;
 
     fn initialize_param_at(ctx: &mut crate::func::FnCtx, idx: usize) -> Self::Ty {
         let variable = ctx.declare_var();
@@ -47,6 +47,6 @@ impl<T> Param for &mut T {
         ctx.builder.declare_var(variable, ctx.module.target_config().pointer_type());
         ctx.builder.def_var(variable, val);
 
-        ProxyMut::new(val, 0)
+        RefMut::new(val, 0)
     }
 }
