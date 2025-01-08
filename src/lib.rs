@@ -11,6 +11,7 @@ mod var;
 mod val;
 mod abi_params;
 mod cmp;
+pub mod ffi;
 
 pub mod prelude {
     pub use crate::control_flow::if_then_else::{If, FlowControl, ControlFlow, IfCtx};

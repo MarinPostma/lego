@@ -30,29 +30,15 @@ pub struct CompiledFunc<'a, P, R> {
     pub(crate) _pth: PhantomData<&'a fn(P) -> R>,
 }
 
-impl<P, R> Call<P, R> for CompiledFunc<'_, P, R>
-where
-    P: Param,
-{
-    fn fn_call(self, input: P) -> R {
-        let f = unsafe {
-            std::mem::transmute::<*const u8, fn(P) -> R>(self.ptr)
-        };
+// impl<P, R> Call<P, R> for CompiledFunc<'_, P, R>
+// where 
+//     Self: super::ffi::Function<Params = P>,
+// {
+//     fn fn_call(self, input: P) -> R {
+//         <<Self as super::ffi::Function>::FFIFn as super::ffi::ToFFIFunctionParams>::call::<R>(self.ptr, input)
+//     }
+// }
 
-        f(input)
-    }
-}
-
-impl<A, B, R> Call<(A, B), R> for CompiledFunc<'_, (A, B), R> {
-
-    fn fn_call(self, (a, b): (A, B)) -> R {
-        let f = unsafe {
-            std::mem::transmute::<*const u8, fn(A, B) -> R>(self.ptr)
-        };
-
-        f(a, b)
-    }
-}
 
 pub struct FnCtx<'a> {
     pub(crate) builder: FunctionBuilder<'a>,
@@ -401,7 +387,7 @@ fn initialize_primitive_param_at<T: ToPrimitive>(ctx: &mut FnCtx, idx: usize) ->
 pub trait Param: ToAbiParams {
     type Ty;
 
-    fn initialize_param_at(ctx: &mut FnCtx, idx: usize) -> Self::Ty;
+    fn initialize_param_at(ctx: &mut FnCtx, idxs: &mut impl Iterator<Item = usize>) -> Self::Ty;
 }
 
 macro_rules! impl_param_primitive {
@@ -409,8 +395,8 @@ macro_rules! impl_param_primitive {
         impl Param for $ty {
             type Ty = Var<$ty>;
 
-            fn initialize_param_at(ctx: &mut FnCtx, idx: usize) -> Self::Ty {
-                initialize_primitive_param_at::<$ty>(ctx, idx)
+            fn initialize_param_at(ctx: &mut FnCtx, idxs: &mut impl Iterator<Item = usize>) -> Self::Ty {
+                initialize_primitive_param_at::<$ty>(ctx, idxs.next().unwrap())
             }
         }
     };
@@ -428,11 +414,12 @@ macro_rules! impl_params_tuples {
 
             #[allow(non_snake_case)] 
             fn initialize(ctx: &mut FnCtx) -> Self::Values {
-                let mut idx = 0;
+                let mut idxs = (0..ctx.builder.block_params(ctx.current_block).len());
                 $(
-                    idx += 1;
-                    let $ty = $ty::initialize_param_at(ctx, idx - 1);
+                    let $ty = $ty::initialize_param_at(ctx, &mut idxs);
                 )*
+
+                assert!(idxs.next().is_none());
 
                 ($($ty),*) 
             }

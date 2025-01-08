@@ -11,6 +11,14 @@ impl ToAbiParams for () {
     fn to_abi_params(_params: &mut Vec<AbiParam>) { }
 }
 
+impl<T> ToAbiParams for &[T] {
+    fn to_abi_params(params: &mut Vec<AbiParam>) {
+        // a slice consist of the len and a pointer to the data
+        usize::to_abi_params(params);
+        usize::to_abi_params(params);
+    }
+}
+
 macro_rules! impl_to_abi_params_primitive {
     ($($ty:ident $(,)?)*) => {
         $(
@@ -32,6 +40,8 @@ impl_to_abi_params_primitive! {
     u16,
     u32,
     u64,
+    usize,
+    isize,
 }
 
 macro_rules! impl_to_abi_params_tuples {

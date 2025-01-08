@@ -82,8 +82,8 @@ macro_rules! impl_unsigned {
 }
 
 for_all_primitives!(impl_common);
-map_ident!(impl_signed: i8, i16, i32, i64);
-map_ident!(impl_unsigned: u8, u16, u32, u64);
+map_ident!(impl_signed: i8, i16, i32, i64, isize);
+map_ident!(impl_unsigned: u8, u16, u32, u64, usize);
 
 // macro from hell?
 // We can't implement Add for all T that implement IntoVal

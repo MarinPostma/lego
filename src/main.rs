@@ -1,35 +1,34 @@
-use lego::prelude::*;
+use lego::{ffi::Function, prelude::*};
 
 fn main() {
     let arg: i32 = std::env::args().nth(1).unwrap().parse().unwrap();
     let builder = Ctx::builder();
     let mut ctx = builder.build();
 
-    /// this function generates code depending on the T type param: we can generate specialized
-    /// implementation of pow on the fly, if a very readable way
-    fn pow<T>(val: T, to: usize) -> impl AsVal<Ty = T::Ty>
-    where
-        T: AsVal,
-        T::Ty: IntMul,
-    {
-        let v = val.value();
-        let mut x = Var::new(val);
-        for _ in 1..to {
-            x *= v;
-        }
-
-        x
-    }
-
-    let main = ctx.func::<&&[u8], i32>(|val| {
+    let main = ctx.func::<(&[i32], &[i32]), i32>(|(val, hello)| {
+        let print_usize = (|val: usize| println!("{val}")).into_host_fn();
+        let print= (|val: i32| println!("{val}")).into_host_fn();
         // right now we can't define closure within lego
-        ControlFlow::Break(1.value())
+        print_usize.fn_call(val.len());
+        {
+            let mut i = Var::new.fn_call((0usize,));
+            {
+                lego::prelude::do_while(|__ctx__|{
+                    while __ctx__.cond(| |i.neq(&val.len())){
+                        {
+                            print.fn_call(val.get(i));
+                            i += 1usize;
+                        }
+                    }lego::prelude::ControlFlow::<(), ()>::Break(())
+                })
+            }
+};
+        ControlFlow::Break(0.value())
     });
 
     // ctx.disas(main);
 
     let main = ctx.get_compiled_function(main);
 
-    // dbg!();
-    // dbg!(main.fn_call(&&[]));
+    dbg!(main.call(([1, 2, 3, 4].as_slice(), &[1i32])));
 }
