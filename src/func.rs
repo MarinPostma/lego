@@ -10,7 +10,7 @@ use cranelift_module::{FuncId, Module};
 use crate::prelude::ControlFlow;
 use crate::proxy::{Ptr, PtrMut};
 use crate::{for_all_primitives, for_all_tuples, maybe_paren};
-use crate::primitive::ToPrimitive;
+use crate::primitive::Primitive;
 use crate::abi_params::ToAbiParams;
 use crate::ctx::Ctx;
 use crate::val::{Val, AsVal};
@@ -366,7 +366,7 @@ impl Params for () {
     fn initialize(_ctx: &mut FnCtx) -> Self::Values { }
 }
 
-fn initialize_primitive_param_at<T: ToPrimitive>(ctx: &mut FnCtx, idx: usize) -> Var<T> { 
+fn initialize_primitive_param_at<T: Primitive>(ctx: &mut FnCtx, idx: usize) -> Var<T> { 
     let variable = ctx.declare_var();
     let val = ctx.builder.block_params(ctx.current_block)[idx];
     ctx.builder.declare_var(variable, T::ty());
@@ -470,7 +470,7 @@ pub trait Results: ToAbiParams {
     type Results: FuncRet;
 }
 
-impl<T: ToPrimitive + ToAbiParams> Results for T {
+impl<T: Primitive + ToAbiParams> Results for T {
     type Results = Val<T>;
 }
 

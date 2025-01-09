@@ -5,10 +5,10 @@ use cranelift::prelude::*;
 use cranelift_module::Module;
 
 use crate::func::{with_ctx, FnCtx, IntoHostFn, Param};
-use crate::primitive::ToPrimitive;
+use crate::primitive::Primitive;
 use crate::val::{AsVal, Val};
 
-impl<T: ToPrimitive> Ref<'_, T> {
+impl<T: Primitive> Ref<'_, T> {
     fn load(&self, ctx: &mut FnCtx) -> Val<T> {
         Val::from_value(ctx.builder.ins().load(
             T::ty(),
@@ -86,6 +86,15 @@ impl<'a, T> AsVal for RefMut<'a, T> {
 }
 
 impl<T> Ref<'_, T> {
+    pub fn deref(&self) -> Val<T>
+where T: Primitive
+    {
+        with_ctx(|ctx| {
+            self.load(ctx)
+        })
+
+    }
+
     #[doc(hidden)]
     pub fn base(&self) -> Val<usize> {
         self.addr.into()
@@ -232,7 +241,7 @@ impl<T> Proxy<T> {
     }
 
     pub fn get_ref(&self) -> Ref<T> {
-        todo!()
+        Ref::new(self.ptr.addr.into(), 0)
     }
 }
 

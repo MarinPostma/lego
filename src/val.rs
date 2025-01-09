@@ -5,7 +5,7 @@ use cranelift::prelude::InstBuilder as _;
 
 use crate::func::with_ctx;
 use crate::func::FnCtx;
-use crate::primitive::ToPrimitive;
+use crate::primitive::Primitive;
 use crate::proxy::PtrMut;
 
 pub struct Val<T> {
@@ -20,7 +20,7 @@ impl<T> Clone for Val<T> {
 
 impl<T> Val<T> {
     pub fn new(val: T) -> Val<T>
-    where T: ToPrimitive,
+    where T: Primitive,
     {
         with_ctx(|ctx| {
             let val = ctx.builder().ins().iconst(T::ty(), val.to_i64());

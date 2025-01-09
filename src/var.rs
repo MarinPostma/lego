@@ -5,7 +5,7 @@ use cranelift_frontend::Variable;
 
 use crate::arithmetic::{IntAdd, IntBitAnd, IntBitOr, IntBitXor, IntDiv, IntMul, IntRem, IntSub};
 use crate::func::{with_ctx, FnCtx};
-use crate::primitive::ToPrimitive;
+use crate::primitive::Primitive;
 use crate::val::{AsVal, Val};
 
 #[derive(Copy, Clone)]
@@ -18,7 +18,7 @@ impl<T> Var<T> {
     pub fn new<V>(v: V) -> Self
     where
         V: AsVal<Ty = T>,
-        T: ToPrimitive,
+        T: Primitive,
     {
         with_ctx(|ctx| {
             let var = ctx.declare_var();

@@ -1,7 +1,7 @@
 use cranelift::prelude::AbiParam;
 
 use crate::for_all_tuples;
-use crate::primitive::ToPrimitive;
+use crate::primitive::Primitive;
 
 pub trait ToAbiParams {
     fn to_abi_params(params: &mut Vec<AbiParam>);

@@ -1,12 +1,12 @@
 use cranelift::prelude::Type;
 use cranelift::prelude::types::*;
 
-pub trait ToPrimitive {
+pub trait Primitive {
     fn to_i64(self) -> i64;
     fn ty() -> Type;
 }
 
-impl<T: Sized> ToPrimitive for &T {
+impl<T: Sized> Primitive for &T {
     fn to_i64(self) -> i64 {
         self as *const T as usize as i64
     }
@@ -16,7 +16,7 @@ impl<T: Sized> ToPrimitive for &T {
     }
 }
 
-impl<T: Sized> ToPrimitive for &mut T {
+impl<T: Sized> Primitive for &mut T {
     fn to_i64(self) -> i64 {
         self as *const T as usize as i64
     }
@@ -26,7 +26,7 @@ impl<T: Sized> ToPrimitive for &mut T {
     }
 }
 
-impl<T: Sized> ToPrimitive for *mut T {
+impl<T: Sized> Primitive for *mut T {
     fn to_i64(self) -> i64 {
         self as usize as i64
     }
@@ -36,7 +36,7 @@ impl<T: Sized> ToPrimitive for *mut T {
     }
 }
 
-impl<T: Sized> ToPrimitive for *const T {
+impl<T: Sized> Primitive for *const T {
     fn to_i64(self) -> i64 {
         self as usize as i64
     }
@@ -46,7 +46,7 @@ impl<T: Sized> ToPrimitive for *const T {
     }
 }
 
-impl ToPrimitive for bool {
+impl Primitive for bool {
     fn to_i64(self) -> i64 {
         if self {
             1
@@ -64,7 +64,7 @@ impl ToPrimitive for bool {
 macro_rules! primitive_jit_ty {
     ($($src:ident $(,)?)*) => {
         $(
-            impl ToPrimitive for $src {
+            impl Primitive for $src {
                 fn to_i64(self) -> i64 {
                     // FIXME: This is probably not good wrt signed integers
                     self as i64

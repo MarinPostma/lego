@@ -31,7 +31,7 @@ impl<T: Param> Proxy<Vec<T>> {
         f.call(self.get_ref())
     }
 
-    pub fn as_slice(&mut self) -> Slice<T> {
+    pub fn as_slice(&self) -> Slice<T> {
         Slice {
             base: self.as_ptr(),
             len: self.len(),

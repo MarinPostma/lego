@@ -21,7 +21,7 @@ pub mod prelude {
     pub use crate::var::Var;
 
     pub use crate::control_flow::while_loop::{do_while, WhileCtx};
-    pub use crate::primitive::ToPrimitive;
+    pub use crate::primitive::Primitive;
     pub use crate::abi_params::ToAbiParams;
 
     pub use crate::proxy::{Ref, RefMut, Proxy};

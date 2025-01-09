@@ -3,7 +3,7 @@ use std::ops::{Add, BitAnd, BitOr, Div, Mul, Rem, Shl, Shr, Sub, BitXor};
 use cranelift::prelude::{InstBuilder, Value};
 
 use crate::{for_all_primitives, map_ident};
-use crate::primitive::ToPrimitive;
+use crate::primitive::Primitive;
 use crate::func::{with_ctx, FnCtx};
 use crate::var::Var;
 use crate::val::{Val, AsVal};
@@ -11,7 +11,7 @@ use crate::val::{Val, AsVal};
 macro_rules! make_arithmetic_traits {
     ($($name:ident $(,)?)*) => {
         $(
-            pub trait $name: ToPrimitive {
+            pub trait $name: Primitive {
                 fn perform(ctx: &mut FnCtx, lhs: Value, rhs: Value) -> Value;
             }
         )*
