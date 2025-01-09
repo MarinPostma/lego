@@ -12,6 +12,7 @@ mod val;
 mod abi_params;
 mod cmp;
 pub mod ffi;
+mod vec;
 
 pub mod prelude {
     pub use crate::control_flow::if_then_else::{If, FlowControl, ControlFlow, IfCtx};
@@ -23,7 +24,8 @@ pub mod prelude {
     pub use crate::primitive::ToPrimitive;
     pub use crate::abi_params::ToAbiParams;
 
-    pub use crate::proxy::{Ref, RefMut};
+    pub use crate::proxy::{Ref, RefMut, Proxy};
+    pub use crate::proxy::Slice;
 
     pub use crate::refs::JitSafe;
     pub use crate::func::IntoHostFn;

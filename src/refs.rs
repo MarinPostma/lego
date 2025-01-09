@@ -26,8 +26,8 @@ impl<T> ToAbiParams for &mut T {
     }
 }
 
-impl<T> Param for &T {
-    type Ty = Ref<T>;
+impl<'a, T> Param for &'a T {
+    type Ty = Ref<'a, T>;
 
     fn initialize_param_at(ctx: &mut crate::func::FnCtx, idxs: &mut impl Iterator<Item = usize>) -> Self::Ty {
         let variable = ctx.declare_var();
@@ -39,8 +39,8 @@ impl<T> Param for &T {
     }
 }
 
-impl<T> Param for &mut T {
-    type Ty = RefMut<T>;
+impl<'a, T> Param for &'a mut T {
+    type Ty = RefMut<'a, T>;
 
     fn initialize_param_at(ctx: &mut crate::func::FnCtx, idxs: &mut impl Iterator<Item = usize>) -> Self::Ty {
         let variable = ctx.declare_var();

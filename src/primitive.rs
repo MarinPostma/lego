@@ -26,6 +26,26 @@ impl<T: Sized> ToPrimitive for &mut T {
     }
 }
 
+impl<T: Sized> ToPrimitive for *mut T {
+    fn to_i64(self) -> i64 {
+        self as usize as i64
+    }
+
+    fn ty() -> Type {
+        Type::int_with_byte_size(size_of::<Self>() as u16).unwrap()
+    }
+}
+
+impl<T: Sized> ToPrimitive for *const T {
+    fn to_i64(self) -> i64 {
+        self as usize as i64
+    }
+
+    fn ty() -> Type {
+        Type::int_with_byte_size(size_of::<Self>() as u16).unwrap()
+    }
+}
+
 impl ToPrimitive for bool {
     fn to_i64(self) -> i64 {
         if self {

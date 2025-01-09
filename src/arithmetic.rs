@@ -4,7 +4,6 @@ use cranelift::prelude::{InstBuilder, Value};
 
 use crate::{for_all_primitives, map_ident};
 use crate::primitive::ToPrimitive;
-use crate::proxy::Ref;
 use crate::func::{with_ctx, FnCtx};
 use crate::var::Var;
 use crate::val::{Val, AsVal};
@@ -133,13 +132,13 @@ macro_rules! impl_op {
     };
 }
 
-impl_op! { Add, IntAdd, add => [Var, Val, Ref] }
-impl_op! { Mul, IntMul, mul => [Var, Val, Ref] }
-impl_op! { Sub, IntSub, sub => [Var, Val, Ref] }
-impl_op! { Div, IntDiv, div => [Var, Val, Ref] }
-impl_op! { Rem, IntRem, rem => [Var, Val, Ref] }
-impl_op! { Shl, IntShl, shl => [Var, Val, Ref] }
-impl_op! { Shr, IntShr, shr => [Var, Val, Ref] }
-impl_op! { BitAnd, IntBitAnd, bitand => [Var, Val, Ref] }
-impl_op! { BitOr, IntBitOr, bitor => [Var, Val, Ref] }
-impl_op! { BitXor, IntBitXor, bitxor => [Var, Val, Ref] }
+impl_op! { Add, IntAdd, add => [Var, Val] }
+impl_op! { Mul, IntMul, mul => [Var, Val] }
+impl_op! { Sub, IntSub, sub => [Var, Val] }
+impl_op! { Div, IntDiv, div => [Var, Val] }
+impl_op! { Rem, IntRem, rem => [Var, Val] }
+impl_op! { Shl, IntShl, shl => [Var, Val] }
+impl_op! { Shr, IntShr, shr => [Var, Val] }
+impl_op! { BitAnd, IntBitAnd, bitand => [Var, Val] }
+impl_op! { BitOr, IntBitOr, bitor => [Var, Val] }
+impl_op! { BitXor, IntBitXor, bitxor => [Var, Val] }

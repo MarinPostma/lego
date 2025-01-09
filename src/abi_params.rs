@@ -19,6 +19,18 @@ impl<T> ToAbiParams for &[T] {
     }
 }
 
+impl<T> ToAbiParams for *mut T {
+    fn to_abi_params(params: &mut Vec<AbiParam>) {
+        params.push(AbiParam::new(<*mut T>::ty()));
+    }
+}
+
+impl<T> ToAbiParams for *const T {
+    fn to_abi_params(params: &mut Vec<AbiParam>) {
+        params.push(AbiParam::new(<*const T>::ty()));
+    }
+}
+
 macro_rules! impl_to_abi_params_primitive {
     ($($ty:ident $(,)?)*) => {
         $(

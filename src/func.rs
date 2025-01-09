@@ -8,6 +8,7 @@ use cranelift_jit::JITModule;
 use cranelift_module::{FuncId, Module};
 
 use crate::prelude::ControlFlow;
+use crate::proxy::{Ptr, PtrMut};
 use crate::{for_all_primitives, for_all_tuples, maybe_paren};
 use crate::primitive::ToPrimitive;
 use crate::abi_params::ToAbiParams;
@@ -29,16 +30,6 @@ pub struct CompiledFunc<'a, P, R> {
     pub(crate) ptr: *const u8,
     pub(crate) _pth: PhantomData<&'a fn(P) -> R>,
 }
-
-// impl<P, R> Call<P, R> for CompiledFunc<'_, P, R>
-// where 
-//     Self: super::ffi::Function<Params = P>,
-// {
-//     fn fn_call(self, input: P) -> R {
-//         <<Self as super::ffi::Function>::FFIFn as super::ffi::ToFFIFunctionParams>::call::<R>(self.ptr, input)
-//     }
-// }
-
 
 pub struct FnCtx<'a> {
     pub(crate) builder: FunctionBuilder<'a>,
@@ -403,6 +394,26 @@ macro_rules! impl_param_primitive {
 }
 
 for_all_primitives!(impl_param_primitive);
+
+impl<T> Param for *mut T {
+    type Ty = PtrMut<T>;
+
+    fn initialize_param_at(ctx: &mut FnCtx, idxs: &mut impl Iterator<Item = usize>) -> Self::Ty {
+        let val = ctx.builder.block_params(ctx.current_block)[idxs.next().unwrap()];
+        let val = Val::from_value(val);
+        PtrMut::from_value(val)
+    }
+}
+
+impl<T> Param for *const T {
+    type Ty = Ptr<T>;
+
+    fn initialize_param_at(ctx: &mut FnCtx, idxs: &mut impl Iterator<Item = usize>) -> Self::Ty {
+        let val = ctx.builder.block_params(ctx.current_block)[idxs.next().unwrap()];
+        let val = Val::from_value(val);
+        Ptr::from_value(val)
+    }
+}
 
 macro_rules! impl_params_tuples {
     ($($ty:ident $(,)?)*) => {
