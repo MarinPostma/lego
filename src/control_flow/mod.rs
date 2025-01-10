@@ -6,6 +6,7 @@ use crate::func::FnCtx;
 
 pub mod if_then_else;
 pub mod while_loop;
+mod then;
 
 pub trait BlockRet {
     /// push param ty for the passed block

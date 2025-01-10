@@ -4,18 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# cranelift = "0.115.0"
-cranelift = { path = "../wasmtime/cranelift/umbrella" }
-# cranelift-codegen = "0.115.0"
-cranelift-codegen = { path = "../wasmtime/cranelift/codegen" }
-# cranelift-frontend = "0.115.0"
-cranelift-frontend = { path = "../wasmtime/cranelift/frontend" }
-# cranelift-jit = "0.115.0"
-cranelift-jit = { path = "../wasmtime/cranelift/jit" }
-# cranelift-module = "0.115.0"
-cranelift-module = { path = "../wasmtime/cranelift/module" }
-# cranelift-native = "0.115.0"
-cranelift-native = { path = "../wasmtime/cranelift/native" }
+cranelift = "0.115.0"
+cranelift-codegen = "0.115.0"
+cranelift-frontend = "0.115.0"
+cranelift-jit = "0.115.0"
+cranelift-module = "0.115.0"
+cranelift-native = "0.115.0"
 disarm64 = "0.1.21"
 iced-x86 = "1.21.0"
 

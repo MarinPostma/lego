@@ -104,9 +104,15 @@ impl Value {
         }
     }
 
-    fn sub(self, other: Value) -> Value {
-        match (self, other) {
+    fn sub(self, other: Value) -> Value { match (self, other) {
             (Value::Int(lhs), Value::Int(rhs)) => Value::Int(lhs - rhs),
+            _ => unreachable!("invalid add"),
+        }
+    }
+
+    fn eq(self, other: Value) -> Value {
+        match (self, other) {
+            (Value::Int(lhs), Value::Int(rhs)) => Value::Bool(lhs.eq(&rhs)),
             _ => unreachable!("invalid add"),
         }
     }
@@ -122,31 +128,18 @@ impl Value {
 
 // TODO: if cflow sucks
 
-// fn eval_if<T: AsType + ToPrimitive>(list: &[Sexp], env: &mut Env) -> Value {
-//     let val = {
-//         {
-//             #[allow(unreachable_code)]
-//             lego::prelude::If::<_, _, _, (), _, _>::new(
-//                 || eval_expression.fn_call((&list[1], env)).into_bool(),
-//                 |__ctx__| {
-//                     lego::prelude::ControlFlow::Break({
-//                         T::unwrap_val.fn_call((eval_expression(&list[2], env),))
-//                     })
-//                 },
-//                 |__ctx__| {
-//                     lego::prelude::ControlFlow::Break({
-//                         T::unwrap_val.fn_call((eval_expression(&list[3], env),))
-//                     })
-//                 },
-//             )
-//             .eval()
-//         }
-//     }
-//     .into_break()
-//     .unwrap();
-//
-//     T::into_value(val)
-// }
+fn eval_if(list: &[Sexp], env: &mut Env) -> Value {
+    eval_expression.fn_call((&list[0], env))
+        .into_bool()
+        .then(|| {
+            eval_expression(&list[1], env);
+            ((), || {
+                eval_expression(&list[2], env);
+            })
+        });
+
+    Value::Null
+}
 
 fn fold_list(op: impl Fn(Value, Value) -> Value, s: &[Sexp], env: &mut Env) -> Value {
     let mut lhs = eval_expression(&s[0], env);
@@ -230,6 +223,11 @@ fn eval_expression(s: &Sexp, env: &mut Env) -> Value {
             Sexp::Atom(Atom::Ident(s)) => match s.as_str() {
                 "+" => fold_list(|a, b| a.add(b), &list[1..], env),
                 "-" => fold_list(|a, b| a.sub(b), &list[1..], env),
+                "=" => {
+                    let lhs = eval_expression(&list[1], env);
+                    let rhs = eval_expression(&list[2], env);
+                    lhs.eq(rhs)
+                },
                 // "if" => eval_if::<u64>(list, env),
                 "foreach" => eval_foreach(&list[1..], env),
                 "print" => {
@@ -237,6 +235,9 @@ fn eval_expression(s: &Sexp, env: &mut Env) -> Value {
                     print(val);
                     Value::Null
                 },
+                "if" => {
+                    eval_if(&list[1..], env)
+                }
                 _ => todo!(),
             },
             _ => todo!(),
@@ -294,7 +295,7 @@ fn print(t: Value) {
 
 fn main() {
     // (select (+ foo 1) (+ foo bar) (from (foo u64) (bar u64)))
-    let expr = "(foreach (lambda [x] (print x)) [1 1 (+ 1 1)])";
+    let expr = "(foreach (lambda [x] (if (= x 2) (print x) (print (+ 2 x)))) [1 1 (+ 1 1)])";
     let e = dbg!(Parser::parse(expr));
 
     let mut ctx = Ctx::builder().build();
