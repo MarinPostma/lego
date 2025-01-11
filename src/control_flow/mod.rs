@@ -1,11 +1,11 @@
-use cranelift::prelude::{Value, Block};
+use cranelift::prelude::{Block, Value};
 
+use crate::func::FnCtx;
 use crate::primitive::Primitive;
 use crate::val::Val;
-use crate::func::FnCtx;
 
-pub mod while_loop;
 mod then;
+pub mod while_loop;
 
 pub trait BlockRet {
     /// push param ty for the passed block
@@ -15,9 +15,9 @@ pub trait BlockRet {
 }
 
 impl BlockRet for () {
-    fn push_param_ty(_ctx: &mut FnCtx, _block: Block) { }
+    fn push_param_ty(_ctx: &mut FnCtx, _block: Block) {}
 
-    fn read_from_ret(_ctx: &mut FnCtx, _block: Block) -> Self { }
+    fn read_from_ret(_ctx: &mut FnCtx, _block: Block) -> Self {}
 
     fn to_block_values(&self) -> Vec<Value> {
         Vec::new()

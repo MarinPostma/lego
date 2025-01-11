@@ -1,5 +1,5 @@
-use std::marker::PhantomData;
 use std::cell::RefCell;
+use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 
 use cranelift::prelude::{Block, InstBuilder, Value};
@@ -8,13 +8,13 @@ use cranelift_jit::JITModule;
 use cranelift_module::{FuncId, Module};
 
 // use crate::prelude::ControlFlow;
-use crate::proxy::{Ptr, PtrMut};
-use crate::{for_all_primitives, for_all_tuples, maybe_paren};
-use crate::primitive::Primitive;
 use crate::abi_params::ToAbiParams;
 use crate::ctx::Ctx;
-use crate::val::{Val, AsVal};
+use crate::primitive::Primitive;
+use crate::proxy::{Ptr, PtrMut};
+use crate::val::{AsVal, Val};
 use crate::var::Var;
+use crate::{for_all_primitives, for_all_tuples, maybe_paren};
 
 thread_local! {
     static FN_CTX: RefCell<Option<*mut FnCtx<'static>>> = const { RefCell::new(None) };
@@ -65,7 +65,8 @@ impl<'a> FnCtx<'a> {
 }
 
 pub(crate) fn with_fn_ctx<F, R>(fn_ctx: &mut FnCtx, f: F) -> R
-where F: FnOnce() -> R,
+where
+    F: FnOnce() -> R,
 {
     FN_CTX.with(|ctx| {
         *ctx.borrow_mut() = Some(fn_ctx as *mut _ as *mut _);
@@ -79,16 +80,12 @@ where F: FnOnce() -> R,
 
 #[doc(hidden)]
 pub fn with_ctx<R>(f: impl FnOnce(&mut FnCtx) -> R) -> R {
-    FN_CTX.with(|ctx| {
-        match *ctx.borrow_mut() {
-            Some(ctx) => {
-                let ctx = unsafe {
-                    &mut *ctx
-                };
-                f(ctx)
-            },
-            None => panic!("not in a function build context"),
+    FN_CTX.with(|ctx| match *ctx.borrow_mut() {
+        Some(ctx) => {
+            let ctx = unsafe { &mut *ctx };
+            f(ctx)
         }
+        None => panic!("not in a function build context"),
     })
 }
 
@@ -104,7 +101,8 @@ where
     R: Results,
 {
     pub(crate) fn new<B>(ctx: &mut Ctx, body: B) -> Self
-    where B: FnOnce(P::Values) -> R::Results,
+    where
+        B: FnOnce(P::Values) -> R::Results,
     {
         P::to_abi_params(&mut ctx.ctx.func.signature.params);
         R::to_abi_params(&mut ctx.ctx.func.signature.returns);
@@ -124,21 +122,30 @@ where
 
         let params = P::initialize(&mut fn_ctx);
 
-        let ret = with_fn_ctx(&mut fn_ctx, || {
-            body(params)
-        });
+        let ret = with_fn_ctx(&mut fn_ctx, || body(params));
 
         ret.return_(&mut fn_ctx);
 
         fn_ctx.builder.finalize();
 
-        let func_id = ctx.module.declare_anonymous_function(&ctx.ctx.func.signature).unwrap();
+        let func_id = ctx
+            .module
+            .declare_anonymous_function(&ctx.ctx.func.signature)
+            .unwrap();
 
         ctx.module.define_function(func_id, &mut ctx.ctx).unwrap();
-        println!("{}", ctx.ctx.compiled_code().as_ref().unwrap().vcode.as_ref().unwrap());
+        println!(
+            "{}",
+            ctx.ctx
+                .compiled_code()
+                .as_ref()
+                .unwrap()
+                .vcode
+                .as_ref()
+                .unwrap()
+        );
         ctx.module.clear_context(&mut ctx.ctx);
         ctx.module.finalize_definitions().unwrap();
-
 
         Self {
             _pth: PhantomData,
@@ -147,7 +154,8 @@ where
     }
 
     pub fn call<T>(&self, params: T) -> R::Results
-        where T: IntoParams<Input = P>
+    where
+        T: IntoParams<Input = P>,
     {
         with_ctx(|ctx| {
             let fn_ref = ctx.module.declare_func_in_func(self.id, ctx.builder.func);
@@ -168,38 +176,54 @@ pub trait HostFn {
     type Params;
     type Returns: Results;
 
-    fn emit_call(&self, ctx: &mut FnCtx, params: impl IntoParams<Input = Self::Params>) -> <Self::Returns as Results>::Results;
+    fn emit_call(
+        &self,
+        ctx: &mut FnCtx,
+        params: impl IntoParams<Input = Self::Params>,
+    ) -> <Self::Returns as Results>::Results;
 }
 
 #[derive(Debug, Copy, Clone)]
 pub struct HostFunc<F, P, R>(F, PhantomData<fn(P) -> R>);
 
-impl<F, P, R> HostFunc<F, P, R> 
-    where Self: HostFn
+impl<F, P, R> HostFunc<F, P, R>
+where
+    Self: HostFn,
 {
-    pub fn call(&self, params: impl IntoParams<Input = <Self as HostFn>::Params>) -> <<Self as HostFn>::Returns as Results>::Results {
-        with_ctx(|ctx| {
-            self.emit_call(ctx, params)
-        })
+    pub fn call(
+        &self,
+        params: impl IntoParams<Input = <Self as HostFn>::Params>,
+    ) -> <<Self as HostFn>::Returns as Results>::Results {
+        with_ctx(|ctx| self.emit_call(ctx, params))
     }
 }
 
 pub trait IntoHostFn<P, R> {
-    fn into_host_fn(self) -> HostFunc<Self, P, R> where  Self: Sized;
+    fn into_host_fn(self) -> HostFunc<Self, P, R>
+    where
+        Self: Sized;
 }
 
 impl<A, R, F> IntoHostFn<(A,), R> for F
-where F: FnOnce(A) -> R
+where
+    F: FnOnce(A) -> R,
 {
-    fn into_host_fn(self) -> HostFunc<Self, (A,), R> where  Self: Sized {
+    fn into_host_fn(self) -> HostFunc<Self, (A,), R>
+    where
+        Self: Sized,
+    {
         HostFunc(self, PhantomData)
     }
 }
 
 impl<A, B, R, F> IntoHostFn<(A, B), R> for F
-where F: FnOnce(A, B) -> R
+where
+    F: FnOnce(A, B) -> R,
 {
-    fn into_host_fn(self) -> HostFunc<Self, (A, B), R> where  Self: Sized {
+    fn into_host_fn(self) -> HostFunc<Self, (A, B), R>
+    where
+        Self: Sized,
+    {
         HostFunc(self, PhantomData)
     }
 }
@@ -239,36 +263,38 @@ macro_rules! impl_as_fn_ptr {
                 (tramp::<FUN , RET, $($ty),*> as extern "C" fn($($ty),*) -> RET) as *const u8
             }
         }
-        
+
     };
 }
 
 #[allow(unused_parens)]
 #[allow(non_snake_case)]
-impl <RET,FUN:Fn(A,) -> RET+Copy,A>AsFnPtr<(A,),RET>for FUN where A:Param {
-    fn as_fn_ptr() ->  *const u8 {
-        #[allow(clippy::let_unit_value,path_statements)]
+impl<RET, FUN: Fn(A) -> RET + Copy, A> AsFnPtr<(A,), RET> for FUN
+where
+    A: Param,
+{
+    fn as_fn_ptr() -> *const u8 {
+        #[allow(clippy::let_unit_value, path_statements)]
         FUN::ASSERT_ZERO_SIZED;
-        extern "C" fn tramp<FUN:Fn(A) -> RET,RET,A, >(A:A) -> RET {
-            let f:FUN = unsafe {
+        extern "C" fn tramp<FUN: Fn(A) -> RET, RET, A>(A: A) -> RET {
+            let f: FUN = unsafe {
                 #[allow(clippy::uninit_assumed_init)]
                 MaybeUninit::uninit().assume_init()
             };
-            f(A,)
+            f(A)
         }
-        (tramp::<FUN,RET,A>as extern "C" fn(A) -> RET)as *const u8
+        (tramp::<FUN, RET, A> as extern "C" fn(A) -> RET) as *const u8
     }
-
-    }
-impl_as_fn_ptr!(A,B);
-impl_as_fn_ptr!(A,B,C);
-impl_as_fn_ptr!(A,B,C,D);
-impl_as_fn_ptr!(A,B,C,D,E);
-impl_as_fn_ptr!(A,B,C,D,E,F);
-impl_as_fn_ptr!(A,B,C,D,E,F,G);
+}
+impl_as_fn_ptr!(A, B);
+impl_as_fn_ptr!(A, B, C);
+impl_as_fn_ptr!(A, B, C, D);
+impl_as_fn_ptr!(A, B, C, D, E);
+impl_as_fn_ptr!(A, B, C, D, E, F);
+impl_as_fn_ptr!(A, B, C, D, E, F, G);
 
 impl<F, A, R> HostFn for HostFunc<F, (A,), R>
-    where
+where
     F: (Fn(A) -> R) + AsFnPtr<(A,), R>,
     A: Param,
     R: Results,
@@ -276,24 +302,31 @@ impl<F, A, R> HostFn for HostFunc<F, (A,), R>
     type Params = A;
     type Returns = R;
 
-    fn emit_call(&self, ctx: &mut FnCtx, params: impl IntoParams<Input = Self::Params>) -> R::Results {
+    fn emit_call(
+        &self,
+        ctx: &mut FnCtx,
+        params: impl IntoParams<Input = Self::Params>,
+    ) -> R::Results {
         let ptr_ty = ctx.module().target_config().pointer_type();
         let mut sig = ctx.module().make_signature();
         A::to_abi_params(&mut sig.params);
         R::to_abi_params(&mut sig.returns);
         let sigref = ctx.builder().import_signature(sig);
 
-        let fptr = ctx.builder().ins().iconst(ptr_ty, F::as_fn_ptr() as usize as i64);
+        let fptr = ctx
+            .builder()
+            .ins()
+            .iconst(ptr_ty, F::as_fn_ptr() as usize as i64);
         let mut args = Vec::new();
         params.params(ctx, &mut args);
-        let call =ctx.builder().ins().call_indirect(sigref, fptr, &args);
+        let call = ctx.builder().ins().call_indirect(sigref, fptr, &args);
         let results = ctx.builder().inst_results(call);
         R::Results::from_func_ret(results)
     }
 }
 
 impl<F, A, B, R> HostFn for HostFunc<F, (A, B), R>
-    where
+where
     F: (Fn(A, B) -> R) + AsFnPtr<(A, B), R>,
     A: Param,
     B: Param,
@@ -302,7 +335,11 @@ impl<F, A, B, R> HostFn for HostFunc<F, (A, B), R>
     type Params = (A, B);
     type Returns = R;
 
-    fn emit_call(&self, ctx: &mut FnCtx, params: impl IntoParams<Input = Self::Params>) -> R::Results {
+    fn emit_call(
+        &self,
+        ctx: &mut FnCtx,
+        params: impl IntoParams<Input = Self::Params>,
+    ) -> R::Results {
         let ptr_ty = ctx.module().target_config().pointer_type();
         let mut sig = ctx.module().make_signature();
         A::to_abi_params(&mut sig.params);
@@ -310,10 +347,13 @@ impl<F, A, B, R> HostFn for HostFunc<F, (A, B), R>
         R::to_abi_params(&mut sig.returns);
         let sigref = ctx.builder().import_signature(sig);
 
-        let fptr = ctx.builder().ins().iconst(ptr_ty, F::as_fn_ptr() as usize as i64);
+        let fptr = ctx
+            .builder()
+            .ins()
+            .iconst(ptr_ty, F::as_fn_ptr() as usize as i64);
         let mut args = Vec::new();
         params.params(ctx, &mut args);
-        let call =ctx.builder().ins().call_indirect(sigref, fptr, &args);
+        let call = ctx.builder().ins().call_indirect(sigref, fptr, &args);
         let results = ctx.builder().inst_results(call);
         R::Results::from_func_ret(results)
     }
@@ -355,10 +395,10 @@ pub trait Params: ToAbiParams {
 impl Params for () {
     type Values = ();
 
-    fn initialize(_ctx: &mut FnCtx) -> Self::Values { }
+    fn initialize(_ctx: &mut FnCtx) -> Self::Values {}
 }
 
-fn initialize_primitive_param_at<T: Primitive>(ctx: &mut FnCtx, idx: usize) -> Var<T> { 
+fn initialize_primitive_param_at<T: Primitive>(ctx: &mut FnCtx, idx: usize) -> Var<T> {
     let variable = ctx.declare_var();
     let val = ctx.builder.block_params(ctx.current_block)[idx];
     ctx.builder.declare_var(variable, T::ty());
@@ -378,7 +418,10 @@ macro_rules! impl_param_primitive {
         impl Param for $ty {
             type Ty = Var<$ty>;
 
-            fn initialize_param_at(ctx: &mut FnCtx, idxs: &mut impl Iterator<Item = usize>) -> Self::Ty {
+            fn initialize_param_at(
+                ctx: &mut FnCtx,
+                idxs: &mut impl Iterator<Item = usize>,
+            ) -> Self::Ty {
                 initialize_primitive_param_at::<$ty>(ctx, idxs.next().unwrap())
             }
         }
@@ -410,12 +453,12 @@ impl<T> Param for *const T {
 macro_rules! impl_params_tuples {
     ($($ty:ident $(,)?)*) => {
         impl<$($ty,)*> Params for maybe_paren!($($ty),*)
-        where 
+        where
             $($ty: Param,)*
         {
             type Values = maybe_paren!($($ty::Ty),*);
 
-            #[allow(non_snake_case)] 
+            #[allow(non_snake_case)]
             fn initialize(ctx: &mut FnCtx) -> Self::Values {
                 let mut idxs = (0..ctx.builder.block_params(ctx.current_block).len());
                 $(
@@ -424,7 +467,7 @@ macro_rules! impl_params_tuples {
 
                 assert!(idxs.next().is_none());
 
-                ($($ty),*) 
+                ($($ty),*)
             }
         }
     };
@@ -440,7 +483,7 @@ pub trait FuncRet {
 impl<T> FuncRet for Val<T> {
     fn from_func_ret(vals: &[Value]) -> Self {
         assert_eq!(vals.len(), 1);
-        Val::from_value(vals[0]) 
+        Val::from_value(vals[0])
     }
 
     fn return_(self, ctx: &mut FnCtx) {
@@ -475,7 +518,7 @@ pub trait Call<I, O> {
 }
 
 impl<F, A, O> Call<(A,), O> for F
-    where
+where
     F: FnMut(A) -> O,
 {
     fn fn_call(mut self, (input,): (A,)) -> O {
@@ -484,7 +527,7 @@ impl<F, A, O> Call<(A,), O> for F
 }
 
 impl<F, A, B, O> Call<(A, B), O> for F
-    where
+where
     F: FnMut(A, B) -> O,
 {
     fn fn_call(mut self, (a, b): (A, B)) -> O {
@@ -493,7 +536,7 @@ impl<F, A, B, O> Call<(A, B), O> for F
 }
 
 impl<F, O> Call<(), O> for F
-    where
+where
     F: FnMut() -> O,
 {
     fn fn_call(mut self, _: ()) -> O {
@@ -501,20 +544,21 @@ impl<F, O> Call<(), O> for F
     }
 }
 
-impl<F, A, O, I> Call<I, <<Self as HostFn>::Returns as Results>::Results> for HostFunc<F, (A, ), O>
-    where
-        Self: HostFn,
-        I: IntoParams<Input = <Self as HostFn>::Params>,
+impl<F, A, O, I> Call<I, <<Self as HostFn>::Returns as Results>::Results> for HostFunc<F, (A,), O>
+where
+    Self: HostFn,
+    I: IntoParams<Input = <Self as HostFn>::Params>,
 {
     fn fn_call(self, p: I) -> <<Self as HostFn>::Returns as Results>::Results {
         self.call(p)
     }
 }
 
-impl<F, A, B, O, I> Call<I, <<Self as HostFn>::Returns as Results>::Results> for HostFunc<F, (A, B), O>
-    where
-        Self: HostFn,
-        I: IntoParams<Input = <Self as HostFn>::Params>,
+impl<F, A, B, O, I> Call<I, <<Self as HostFn>::Returns as Results>::Results>
+    for HostFunc<F, (A, B), O>
+where
+    Self: HostFn,
+    I: IntoParams<Input = <Self as HostFn>::Params>,
 {
     fn fn_call(self, p: I) -> <<Self as HostFn>::Returns as Results>::Results {
         self.call(p)

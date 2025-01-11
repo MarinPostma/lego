@@ -1,7 +1,9 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote, ToTokens};
-use syn::{parse_macro_input, Attribute, Block, DataStruct, DeriveInput, Expr, Ident, Type, Visibility};
 use syn::visit_mut::{visit_block_mut, visit_expr_mut, VisitMut};
+use syn::{
+    parse_macro_input, Attribute, Block, DataStruct, DeriveInput, Expr, Ident, Type, Visibility,
+};
 
 struct RewriteVisitor {
     if_depth: usize,
@@ -65,7 +67,9 @@ impl VisitMut for RewriteVisitor {
             // }
             Expr::Call(call) => {
                 visit_expr_mut(self, &mut call.func);
-                call.args.iter_mut().for_each(|arg| visit_expr_mut(self, arg));
+                call.args
+                    .iter_mut()
+                    .for_each(|arg| visit_expr_mut(self, arg));
 
                 let callee = &call.func;
                 let params = call.args.iter();
@@ -108,14 +112,15 @@ impl VisitMut for RewriteVisitor {
                         //     lego::prelude::ControlFlow::Preempt => return lego::prelude::ControlFlow::Preempt,
                         // }
                     }
-                }.into();
+                }
+                .into();
 
                 *e = syn::parse::<Expr>(new).unwrap();
             }
             Expr::Break(_) => {
                 panic!("break not supported")
             }
-            Expr::Continue(_ ) => {
+            Expr::Continue(_) => {
                 panic!("continue not supported")
             }
             Expr::Return(ret) => {
@@ -128,13 +133,13 @@ impl VisitMut for RewriteVisitor {
                         Some(ref e) => quote! { #e },
                         None => quote! { () },
                     };
-                    let handle_cflow = handle_control_flow(quote!{ __ctx__.ret(#ret_e) });
+                    let handle_cflow = handle_control_flow(quote! { __ctx__.ret(#ret_e) });
                     let new_ret = quote! {
                         #handle_cflow
                     };
                     *e = syn::parse::<Expr>(new_ret.into()).unwrap();
                 }
-            },
+            }
             Expr::While(while_expr) => {
                 visit_expr_mut(self, &mut while_expr.cond);
                 visit_block_mut(self, &mut while_expr.body);
@@ -158,7 +163,7 @@ impl VisitMut for RewriteVisitor {
                     }
                 };
                 *e = syn::parse(new_while.into()).unwrap();
-            },
+            }
             e => visit_expr_mut(self, e),
         }
     }
@@ -178,7 +183,8 @@ pub fn lego(input: TokenStream) -> TokenStream {
     RewriteVisitor::new().visit_block_mut(&mut input);
     quote! {
         #input
-    }.into()
+    }
+    .into()
 }
 
 #[proc_macro_derive(LegoBlock)]
@@ -186,14 +192,17 @@ pub fn derive_lego_block(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     let res = match input.data {
-        syn::Data::Struct(ref data_struct) => derive_struct(data_struct, &input.attrs, &input.ident, &input.vis),
+        syn::Data::Struct(ref data_struct) => {
+            derive_struct(data_struct, &input.attrs, &input.ident, &input.vis)
+        }
         syn::Data::Enum(_) => todo!(),
         syn::Data::Union(_) => todo!(),
     };
 
     quote! {
         #res
-    }.into()
+    }
+    .into()
 }
 
 fn trait_proxy_fn_sig(vis: &Visibility, name: &Ident, ty: &Type) -> impl ToTokens {
@@ -209,8 +218,15 @@ fn trait_proxy_mut_fn_sig(vis: &Visibility, name: &Ident, ty: &Type) -> impl ToT
     }
 }
 
-fn derive_struct(s: &DataStruct, _attrs: &[Attribute], name: &Ident, vis: &Visibility) -> impl ToTokens {
-    let syn::Fields::Named(ref fields) = &s.fields else { panic!("only named structs are supported") };
+fn derive_struct(
+    s: &DataStruct,
+    _attrs: &[Attribute],
+    name: &Ident,
+    vis: &Visibility,
+) -> impl ToTokens {
+    let syn::Fields::Named(ref fields) = &s.fields else {
+        panic!("only named structs are supported")
+    };
     let proxy_trait_ident = format_ident!("{name}Proxy");
     let proxy_trait_ident_mut = format_ident!("{name}ProxyMut");
 

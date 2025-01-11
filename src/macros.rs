@@ -39,4 +39,3 @@ macro_rules! maybe_paren {
         ($($ty),*)
     };
 }
-

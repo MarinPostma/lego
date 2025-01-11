@@ -1,5 +1,7 @@
 use std::marker::PhantomData;
-use std::ops::{AddAssign, BitAndAssign, BitOrAssign, BitXorAssign, DivAssign, MulAssign, RemAssign, SubAssign};
+use std::ops::{
+    AddAssign, BitAndAssign, BitOrAssign, BitXorAssign, DivAssign, MulAssign, RemAssign, SubAssign,
+};
 
 use cranelift_frontend::Variable;
 
@@ -29,8 +31,9 @@ impl<T> Var<T> {
         })
     }
 
-    pub fn decl() -> Self 
-        where T: Primitive,
+    pub fn decl() -> Self
+    where
+        T: Primitive,
     {
         with_ctx(|ctx| {
             let var = ctx.declare_var();

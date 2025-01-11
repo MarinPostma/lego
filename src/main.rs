@@ -9,7 +9,7 @@ fn main() {
 
     let before = Instant::now();
     let main = ctx.func::<usize, i32>(|_val| {
-        let print  = (|v: usize| println!("val: {v}")).into_host_fn();
+        let print = (|v: usize| println!("val: {v}")).into_host_fn();
         let sum = (0usize..30)
             .into_jiter()
             .filter(|it| (*it % 2usize).eq(0usize.value()))
@@ -19,9 +19,7 @@ fn main() {
                 // print.call(it);
                 it / 3
             })
-            .fold(Val::new(0usize), |acc, it| {
-                acc + it
-            });
+            .fold(Val::new(0usize), |acc, it| acc + it);
 
         print.call(sum);
         0.value()

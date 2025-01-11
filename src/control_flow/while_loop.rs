@@ -28,13 +28,9 @@ where
         let ret = BR::read_from_ret(ctx, header_block);
         let builder = ctx.builder();
         let params = ret.to_block_values();
-        builder.ins().brif(
-            header_val.value(),
-            body_block,
-            &params,
-            exit_block,
-            &params,
-        );
+        builder
+            .ins()
+            .brif(header_val.value(), body_block, &params, exit_block, &params);
         builder.switch_to_block(body_block);
         builder.seal_block(body_block);
         BR::read_from_ret(ctx, body_block)

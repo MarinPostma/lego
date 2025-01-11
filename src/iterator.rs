@@ -1,10 +1,10 @@
 use std::ops::Range;
 
+use crate::cmp::Compare;
 use crate::control_flow::while_loop::do_while2;
 use crate::control_flow::BlockRet;
-use crate::val::{AsVal, Val};
 use crate::prelude::Primitive;
-use crate::cmp::Compare;
+use crate::val::{AsVal, Val};
 use crate::var::Var;
 
 pub trait JIterator {
@@ -12,15 +12,12 @@ pub trait JIterator {
 
     fn next(&mut self) -> (Val<bool>, Self::Item);
 
-    fn map<F, B>(self, f: F) -> Map<Self, F> 
-    where 
+    fn map<F, B>(self, f: F) -> Map<Self, F>
+    where
         F: FnMut(Self::Item) -> B,
         Self: Sized,
     {
-        Map {
-            inner: self,
-            f,
-        }
+        Map { inner: self, f }
     }
 
     fn filter<F>(self, f: F) -> Filter<Self, F>
@@ -28,10 +25,7 @@ pub trait JIterator {
         F: FnMut(&Self::Item) -> Val<bool>,
         Self: Sized,
     {
-        Filter {
-            inner: self,
-            f,
-        }
+        Filter { inner: self, f }
     }
 
     fn for_each<F>(mut self, mut f: F)
@@ -72,7 +66,7 @@ pub struct Map<T, F> {
 }
 
 impl<T, F, B> JIterator for Map<T, F>
-    where
+where
     T: JIterator,
     F: FnMut(T::Item) -> B,
     B: BlockRet,
@@ -88,7 +82,7 @@ impl<T, F, B> JIterator for Map<T, F>
 pub trait IntoJiter {
     type Iter: JIterator<Item = Self::Item>;
     type Item;
-    
+
     fn into_jiter(self) -> Self::Iter;
 }
 
@@ -108,7 +102,7 @@ impl Step for Var<usize> {
 }
 
 impl<Idx> JIterator for RangeJiter<Idx>
-where 
+where
     Val<Idx>: Compare,
     Var<Idx>: Step,
 {
@@ -122,7 +116,7 @@ where
 }
 
 impl<Idx> IntoJiter for Range<Idx>
-where 
+where
     Val<Idx>: Compare,
     Var<Idx>: Step,
     Idx: Primitive + AsVal<Ty = Idx>,
@@ -143,7 +137,7 @@ pub struct Filter<T, F> {
     f: F,
 }
 
-impl<T, F> JIterator for Filter<T, F> 
+impl<T, F> JIterator for Filter<T, F>
 where
     T: JIterator,
     F: FnMut(&T::Item) -> Val<bool>,
@@ -155,13 +149,15 @@ where
         let mut has_more = Var::new(true);
         let mut it = None;
         let mut cont = Var::new(true);
-        do_while2((), || (cont.value(), |_| {
-            let (more, val) = self.inner.next();
-            let take = (self.f)(&val);
-            it = Some(val);
-            has_more.assign(more);
-            cont.assign(more & take);
-        }));
+        do_while2((), || {
+            (cont.value(), |_| {
+                let (more, val) = self.inner.next();
+                let take = (self.f)(&val);
+                it = Some(val);
+                has_more.assign(more);
+                cont.assign(more & take);
+            })
+        });
 
         (has_more.value(), it.unwrap())
     }

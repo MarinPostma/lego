@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
-use cranelift::prelude::Value;
 use cranelift::prelude::InstBuilder as _;
+use cranelift::prelude::Value;
 
 use crate::func::with_ctx;
 use crate::func::FnCtx;
@@ -15,12 +15,15 @@ pub struct Val<T> {
 
 impl<T> Copy for Val<T> {}
 impl<T> Clone for Val<T> {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 
 impl<T> Val<T> {
     pub fn new(val: T) -> Val<T>
-    where T: Primitive,
+    where
+        T: Primitive,
     {
         with_ctx(|ctx| {
             let val = ctx.builder().ins().iconst(T::ty(), val.to_i64());
@@ -30,7 +33,10 @@ impl<T> Val<T> {
 
     // TODO: this should be unsafe
     pub(crate) fn from_value(value: Value) -> Self {
-        Self { value, _pth: PhantomData }
+        Self {
+            value,
+            _pth: PhantomData,
+        }
     }
 
     pub(crate) fn value(&self) -> Value {
@@ -46,9 +52,7 @@ impl<T> Val<T> {
 impl<T> From<Val<*mut T>> for Val<*const T> {
     fn from(value: Val<*mut T>) -> Self {
         // it's always safe to get a *const T from a *mut T, and they are the safe size
-        unsafe {
-            value.transmute()
-        }
+        unsafe { value.transmute() }
     }
 }
 
@@ -74,9 +78,7 @@ pub trait AsVal {
     type Ty;
 
     fn value(&self) -> Val<Self::Ty> {
-        with_ctx(|ctx| {
-            self.as_val(ctx)
-        })
+        with_ctx(|ctx| self.as_val(ctx))
     }
 
     fn as_val(&self, ctx: &mut FnCtx) -> Val<Self::Ty>;

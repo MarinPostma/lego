@@ -1,5 +1,5 @@
-use std::marker::PhantomData;
 use std::collections::HashMap;
+use std::marker::PhantomData;
 
 use cranelift::prelude::Configurable as _;
 use cranelift_codegen::settings;
@@ -41,7 +41,6 @@ macro_rules! host_fns {
     };
 }
 
-
 impl CtxBuilder {
     pub fn register_host_functions(&mut self, f: impl IntoIterator<Item = NamedHostFn>) {
         self.registered_functions.extend(f);
@@ -76,7 +75,6 @@ impl CtxBuilder {
             ctx,
             module,
         }
-
     }
 }
 
@@ -101,7 +99,10 @@ impl Ctx {
 
     pub fn get_compiled_function<P, R>(&self, f: Func<P, R>) -> CompiledFunc<P, R> {
         let ptr = self.module.get_finalized_function(f.id());
-        CompiledFunc { ptr, _pth: PhantomData }
+        CompiledFunc {
+            ptr,
+            _pth: PhantomData,
+        }
     }
 
     // #[cfg(target_arch = "x86_64")]
@@ -180,4 +181,3 @@ impl Ctx {
         &self.ctx
     }
 }
-

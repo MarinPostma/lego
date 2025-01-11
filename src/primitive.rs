@@ -1,5 +1,5 @@
-use cranelift::prelude::Type;
 use cranelift::prelude::types::*;
+use cranelift::prelude::Type;
 
 pub trait Primitive {
     fn to_i64(self) -> i64;
@@ -59,7 +59,6 @@ impl Primitive for bool {
         I8
     }
 }
-
 
 macro_rules! primitive_jit_ty {
     ($($src:ident $(,)?)*) => {

@@ -68,9 +68,7 @@ impl<'a, T> AsVal for Ref<'a, T> {
 
     fn as_val(&self, ctx: &mut FnCtx) -> Val<Self::Ty> {
         // safety: we trivially know that this is a &T
-        unsafe {
-            self.addr(ctx).transmute()
-        }
+        unsafe { self.addr(ctx).transmute() }
     }
 }
 
@@ -79,20 +77,16 @@ impl<'a, T> AsVal for RefMut<'a, T> {
 
     fn as_val(&self, ctx: &mut FnCtx) -> Val<Self::Ty> {
         // safety: we trivially know that this is a &mut T
-        unsafe {
-            self.addr(ctx).transmute()
-        }
+        unsafe { self.addr(ctx).transmute() }
     }
 }
 
 impl<T> Ref<'_, T> {
     pub fn deref(&self) -> Val<T>
-where T: Primitive
+    where
+        T: Primitive,
     {
-        with_ctx(|ctx| {
-            self.load(ctx)
-        })
-
+        with_ctx(|ctx| self.load(ctx))
     }
 
     #[doc(hidden)]

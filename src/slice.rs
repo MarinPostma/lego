@@ -1,11 +1,11 @@
 use std::marker::PhantomData;
 
 use crate::cmp::Compare;
-use crate::prelude::IntoJiter;
-use crate::val::{AsVal, Val};
-use crate::proxy::Ref;
 use crate::func::{FnCtx, Param};
 use crate::iterator::JIterator;
+use crate::prelude::IntoJiter;
+use crate::proxy::Ref;
+use crate::val::{AsVal, Val};
 use crate::var::Var;
 
 pub struct Slice<'a, T> {
@@ -53,7 +53,7 @@ impl<'a, T> Param for &'a [T] {
     }
 }
 
-pub struct SliceIter<'a, T>{
+pub struct SliceIter<'a, T> {
     index: Var<usize>,
     slice: Slice<'a, T>,
 }

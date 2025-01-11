@@ -8,7 +8,7 @@ pub trait ToAbiParams {
 }
 
 impl ToAbiParams for () {
-    fn to_abi_params(_params: &mut Vec<AbiParam>) { }
+    fn to_abi_params(_params: &mut Vec<AbiParam>) {}
 }
 
 impl<T> ToAbiParams for &[T] {
@@ -59,7 +59,7 @@ impl_to_abi_params_primitive! {
 macro_rules! impl_to_abi_params_tuples {
     ($($ty:ident $(,)?)*) => {
         impl<$($ty,)*> ToAbiParams for ($($ty,)*)
-        where 
+        where
             $($ty: ToAbiParams,)*
         {
             fn to_abi_params(params: &mut Vec<AbiParam>) {

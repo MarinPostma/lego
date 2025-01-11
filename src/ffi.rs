@@ -2,11 +2,11 @@ use core::fmt;
 
 use super::func::CompiledFunc;
 
-pub trait Function { 
+pub trait Function {
     type FFIFn: ToFFIFunctionParams;
     type Params;
     type Result;
-    
+
     fn call(&self, params: Self::Params) -> Self::Result;
 }
 
@@ -31,7 +31,7 @@ impl<T: fmt::Debug> Primitive for &[T] {}
 
 impl<T: Primitive> ToFFIFunctionParams for Param<Bottom, T> {
     unsafe fn call<R>(self, f: *const u8) -> R {
-        let Param(_, a)  = self;
+        let Param(_, a) = self;
         let f = std::mem::transmute::<*const u8, extern "C" fn(T) -> R>(f);
         f(a)
     }
@@ -45,16 +45,20 @@ impl<T: Primitive, U: Primitive> ToFFIFunctionParams for Param<Param<Bottom, T>,
     }
 }
 
-impl<T: Primitive, U: Primitive, V: Primitive> ToFFIFunctionParams for Param<Param<Param<Bottom, T>, U>, V> {
+impl<T: Primitive, U: Primitive, V: Primitive> ToFFIFunctionParams
+    for Param<Param<Param<Bottom, T>, U>, V>
+{
     unsafe fn call<R>(self, f: *const u8) -> R {
-        let Param(Param(Param(_, a), b), c)  = self;
+        let Param(Param(Param(_, a), b), c) = self;
         dbg!((&a, &b, &c));
         let f = std::mem::transmute::<*const u8, extern "C" fn(T, U, V) -> R>(f);
         f(a, b, c)
     }
 }
 
-impl<T: Primitive, U: Primitive, V: Primitive, W: Primitive> ToFFIFunctionParams for Param<Param<Param<Param<Bottom, T>, U>, V>, W> {
+impl<T: Primitive, U: Primitive, V: Primitive, W: Primitive> ToFFIFunctionParams
+    for Param<Param<Param<Param<Bottom, T>, U>, V>, W>
+{
     unsafe fn call<R>(self, f: *const u8) -> R {
         let Param(Param(Param(Param(_, a), b), c), d) = self;
         dbg!((&a, &b, &c, &d));
@@ -97,7 +101,6 @@ impl<T: fmt::Debug> ToFFIParams for &[T] {
     type Out<U> = <usize as ToFFIParams>::Out<<usize as ToFFIParams>::Out<U>>;
 
     fn to_ffi_params<U>(self, t: U) -> Self::Out<U> {
-        dbg!(self);
         Param(Param(t, self.as_ptr() as usize), self.len())
     }
 }
@@ -110,7 +113,6 @@ where
     type Out<T> = A::Out<B::Out<T>>;
 
     fn to_ffi_params<T>(self, t: T) -> Self::Out<T> {
-        dbg!(&self);
         self.0.to_ffi_params(self.1.to_ffi_params(t))
     }
 }
@@ -124,7 +126,8 @@ where
     type Out<T> = A::Out<B::Out<C::Out<T>>>;
 
     fn to_ffi_params<T>(self, t: T) -> Self::Out<T> {
-        self.0.to_ffi_params(self.1.to_ffi_params(self.2.to_ffi_params(t)))
+        self.0
+            .to_ffi_params(self.1.to_ffi_params(self.2.to_ffi_params(t)))
     }
 }
 
@@ -141,8 +144,6 @@ where
         let params = params.to_ffi_params(Bottom);
         // safety: CompiledFunction guarantees the provenance of the function pointer, and we
         // correct type is asserted at compile time.
-        unsafe {
-            params.call(self.ptr)
-        }
+        unsafe { params.call(self.ptr) }
     }
 }

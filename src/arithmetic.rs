@@ -1,12 +1,12 @@
-use std::ops::{Add, BitAnd, BitOr, Div, Mul, Rem, Shl, Shr, Sub, BitXor};
+use std::ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Rem, Shl, Shr, Sub};
 
 use cranelift::prelude::{InstBuilder, Value};
 
-use crate::{for_all_primitives, map_ident};
-use crate::primitive::Primitive;
 use crate::func::{with_ctx, FnCtx};
+use crate::primitive::Primitive;
+use crate::val::{AsVal, Val};
 use crate::var::Var;
-use crate::val::{Val, AsVal};
+use crate::{for_all_primitives, map_ident};
 
 macro_rules! make_arithmetic_traits {
     ($($name:ident $(,)?)*) => {
@@ -48,7 +48,7 @@ macro_rules! impl_arithmetic {
 
 macro_rules! impl_common {
     ($ty:ident) => {
-        impl_arithmetic!($ty: 
+        impl_arithmetic!($ty:
             IntAdd => |ctx, lhs, rhs| ctx.builder().ins().iadd(lhs, rhs),
             IntSub => |ctx, lhs, rhs| ctx.builder().ins().isub(lhs, rhs),
             IntMul => |ctx, lhs, rhs| ctx.builder().ins().imul(lhs, rhs),
@@ -62,7 +62,7 @@ macro_rules! impl_common {
 
 macro_rules! impl_signed {
     ($ty:ident) => {
-        impl_arithmetic!($ty: 
+        impl_arithmetic!($ty:
             IntDiv => |ctx, lhs, rhs| ctx.builder().ins().sdiv(lhs, rhs),
             IntRem => |ctx, lhs, rhs| ctx.builder().ins().srem(lhs, rhs),
             IntShr => |ctx, lhs, rhs| ctx.builder().ins().sshr(lhs, rhs),
@@ -72,7 +72,7 @@ macro_rules! impl_signed {
 
 macro_rules! impl_unsigned {
     ($ty:ident) => {
-        impl_arithmetic!($ty: 
+        impl_arithmetic!($ty:
             IntDiv => |ctx, lhs, rhs| ctx.builder().ins().udiv(lhs, rhs),
             IntRem => |ctx, lhs, rhs| ctx.builder().ins().urem(lhs, rhs),
             IntShr => |ctx, lhs, rhs| ctx.builder().ins().ushr(lhs, rhs),
@@ -88,9 +88,7 @@ impl BitAnd<Val<bool>> for Val<bool> {
     type Output = Val<bool>;
 
     fn bitand(self, rhs: Val<bool>) -> Self::Output {
-        with_ctx(|ctx| {
-            Val::from_value(ctx.builder().ins().band(self.value(), rhs.value()))
-        })
+        with_ctx(|ctx| Val::from_value(ctx.builder().ins().band(self.value(), rhs.value())))
     }
 }
 
@@ -129,7 +127,7 @@ macro_rules! impl_op {
         $(
             impl<T: $bound> $op<$lhs<T>> for $rhs<T> {
                 type Output = Val<T>;
-            
+
                 fn $f(self, rhs: $lhs<T>) -> Self::Output {
                     with_ctx(|ctx| -> Val<T> {
                         let lhs = self.as_val(ctx);

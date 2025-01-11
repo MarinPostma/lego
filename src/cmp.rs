@@ -1,8 +1,8 @@
 use cranelift::prelude::{InstBuilder as _, IntCC};
 
 use crate::for_all_primitives;
-use crate::val::{AsVal, Val};
 use crate::func::with_ctx;
+use crate::val::{AsVal, Val};
 
 macro_rules! cmp_var {
     ($ty:ident) => {
@@ -11,7 +11,10 @@ macro_rules! cmp_var {
                 with_ctx(|ctx| {
                     let lhs = self.as_val(ctx);
                     let rhs = other.as_val(ctx);
-                    let val = ctx.builder().ins().icmp(IntCC::Equal, lhs.value(), rhs.value());
+                    let val = ctx
+                        .builder()
+                        .ins()
+                        .icmp(IntCC::Equal, lhs.value(), rhs.value());
                     Val::from_value(val)
                 })
             }
@@ -20,7 +23,10 @@ macro_rules! cmp_var {
                 with_ctx(|ctx| {
                     let lhs = self.as_val(ctx);
                     let rhs = other.as_val(ctx);
-                    let val = ctx.builder().ins().icmp(IntCC::NotEqual, lhs.value(), rhs.value());
+                    let val = ctx
+                        .builder()
+                        .ins()
+                        .icmp(IntCC::NotEqual, lhs.value(), rhs.value());
                     Val::from_value(val)
                 })
             }
@@ -30,7 +36,7 @@ macro_rules! cmp_var {
 
 for_all_primitives!(cmp_var);
 
-// impl<T, U, P> Compare<&U> for &T 
+// impl<T, U, P> Compare<&U> for &T
 // where
 //     T: AsVal<Ty = P>,
 //     U: AsVal<Ty = P>,

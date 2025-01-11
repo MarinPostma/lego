@@ -1,12 +1,15 @@
 use cranelift::prelude::{Block, InstBuilder};
 
-use crate::{func::{with_ctx, FnCtx}, val::Val};
+use crate::{
+    func::{with_ctx, FnCtx},
+    val::Val,
+};
 
 use super::BlockRet;
 
 impl Val<bool> {
     pub fn then<T, E, B>(self, f: T) -> B
-    where 
+    where
         T: FnOnce() -> (B, E),
         E: FnOnce() -> B,
         B: BlockRet,
@@ -24,7 +27,9 @@ impl Val<bool> {
 
         with_ctx(|ctx| {
             // B::jump_to(then_val, ctx, merge_block);
-            ctx.builder().ins().jump(merge_block, &then_val.to_block_values());
+            ctx.builder()
+                .ins()
+                .jump(merge_block, &then_val.to_block_values());
             ctx.builder().switch_to_block(else_block);
             ctx.builder().seal_block(else_block);
         });
@@ -33,7 +38,9 @@ impl Val<bool> {
 
         with_ctx(|ctx| {
             // B::jump_to(else_val, ctx, merge_block);
-            ctx.builder().ins().jump(merge_block, &else_val.to_block_values());
+            ctx.builder()
+                .ins()
+                .jump(merge_block, &else_val.to_block_values());
 
             let b = ctx.builder();
             b.switch_to_block(merge_block);
