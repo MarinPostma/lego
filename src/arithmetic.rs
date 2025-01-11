@@ -84,6 +84,16 @@ for_all_primitives!(impl_common);
 map_ident!(impl_signed: i8, i16, i32, i64, isize);
 map_ident!(impl_unsigned: u8, u16, u32, u64, usize);
 
+impl BitAnd<Val<bool>> for Val<bool> {
+    type Output = Val<bool>;
+
+    fn bitand(self, rhs: Val<bool>) -> Self::Output {
+        with_ctx(|ctx| {
+            Val::from_value(ctx.builder().ins().band(self.value(), rhs.value()))
+        })
+    }
+}
+
 // macro from hell?
 // We can't implement Add for all T that implement IntoVal
 macro_rules! impl_op {

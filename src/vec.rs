@@ -1,5 +1,6 @@
+use crate::slice::Slice;
 use crate::val::Val;
-use crate::proxy::{Proxy, Slice};
+use crate::proxy::Proxy;
 use crate::func::{IntoHostFn as _, Param};
 
 impl<T: Param> Proxy<Vec<T>> {

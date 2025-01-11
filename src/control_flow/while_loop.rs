@@ -1,11 +1,11 @@
 use core::panic;
 use std::any::Any;
 
-use cranelift::prelude::{Block, InstBuilder};
+use cranelift::prelude::{Block, InstBuilder, Value};
 
 use crate::{func::with_ctx, val::Val};
 
-use super::if_then_else::ControlFlow;
+use super::{if_then_else::ControlFlow, BlockRet};
 
 pub trait Cond<R, Test> {
     /// initialize the condition, returning the state
@@ -32,7 +32,10 @@ where
     }
 
     fn eval(&mut self, state: &mut dyn CondState<R>) -> bool {
-        state.as_mut_any().downcast_mut::<()>().expect("loop is not well typed");
+        state
+            .as_mut_any()
+            .downcast_mut::<()>()
+            .expect("loop is not well typed");
         (self)()
     }
 }
@@ -68,14 +71,20 @@ where
     fn init() -> Box<dyn CondState<R>> {
         let [header_block, body_block, exit_block] = with_ctx(|ctx| {
             let [header_block, body_block, exit_block] = ctx.create_blocks();
-    
+
             let builder = ctx.builder();
             builder.ins().jump(header_block, &[]);
             builder.switch_to_block(header_block);
             [header_block, body_block, exit_block]
         });
 
-        Box::new(GenState { has_body: false, body_block, exit_block, finalized: false, header_block })
+        Box::new(GenState {
+            has_body: false,
+            body_block,
+            exit_block,
+            finalized: false,
+            header_block,
+        })
     }
 
     fn eval(&mut self, state: &mut dyn CondState<R>) -> bool {
@@ -101,7 +110,13 @@ where
 
             with_ctx(|ctx| {
                 let builder = ctx.builder();
-                builder.ins().brif(header_val.value(), state.body_block, &[], state.exit_block, &[]);
+                builder.ins().brif(
+                    header_val.value(),
+                    state.body_block,
+                    &[],
+                    state.exit_block,
+                    &[],
+                );
                 builder.switch_to_block(state.body_block);
                 builder.seal_block(state.body_block);
             });
@@ -134,15 +149,47 @@ impl<R> WhileCtx<R> {
     }
 }
 
-
-pub fn do_while<R>(
-    f: impl FnOnce(&mut WhileCtx<R>) -> ControlFlow<(), R>,
-) -> ControlFlow<(), R> {
-    let mut ctx = WhileCtx {
-        state: None,
-    };
+pub fn do_while<R>(f: impl FnOnce(&mut WhileCtx<R>) -> ControlFlow<(), R>) -> ControlFlow<(), R> {
+    let mut ctx = WhileCtx { state: None };
 
     f(&mut ctx)
+}
+
+pub fn do_while2<C, B, BR>(f: C) -> BR
+where
+    C: FnOnce() -> (Val<bool>, B),
+    B: FnOnce() -> BR,
+{
+    let [header_block, body_block, exit_block] = with_ctx(|ctx| {
+        let [header_block, body_block, exit_block] = ctx.create_blocks();
+
+        let builder = ctx.builder();
+        builder.ins().jump(header_block, &[]);
+        builder.switch_to_block(header_block);
+        [header_block, body_block, exit_block]
+    });
+
+    let (header_val, body_fn) = f();
+
+    with_ctx(|ctx| {
+        let builder = ctx.builder();
+        builder
+            .ins()
+            .brif(header_val.value(), body_block, &[], exit_block, &[]);
+        builder.switch_to_block(body_block);
+        builder.seal_block(body_block);
+    });
+
+    let body_val = (body_fn)();
+
+    with_ctx(|ctx| {
+        let builder = ctx.builder();
+        builder.ins().jump(header_block, &[]);
+        builder.switch_to_block(exit_block);
+        builder.seal_block(header_block);
+        builder.seal_block(exit_block);
+    });
+    body_val
 }
 
 #[cfg(test)]

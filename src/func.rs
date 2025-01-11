@@ -144,6 +144,7 @@ where
         let func_id = ctx.module.declare_anonymous_function(&ctx.ctx.func.signature).unwrap();
 
         ctx.module.define_function(func_id, &mut ctx.ctx).unwrap();
+        println!("{}", ctx.ctx.compiled_code().as_ref().unwrap().vcode.as_ref().unwrap());
         ctx.module.clear_context(&mut ctx.ctx);
         ctx.module.finalize_definitions().unwrap();
 

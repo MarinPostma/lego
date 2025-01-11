@@ -69,8 +69,8 @@ impl CtxBuilder {
 
         let module = JITModule::new(builder);
 
-        let ctx = module.make_context();
-        // ctx.want_disasm = true;
+        let mut ctx = module.make_context();
+        ctx.want_disasm = true;
         Ctx {
             fn_builder_ctx: FunctionBuilderContext::new(),
             ctx,

@@ -4,7 +4,7 @@ use std::ops::Deref;
 use cranelift::prelude::*;
 use cranelift_module::Module;
 
-use crate::func::{with_ctx, FnCtx, IntoHostFn, Param};
+use crate::func::{with_ctx, FnCtx, IntoHostFn};
 use crate::primitive::Primitive;
 use crate::val::{AsVal, Val};
 
@@ -123,39 +123,6 @@ where T: Primitive
             addr,
             offset,
             _pth: PhantomData,
-        }
-    }
-}
-
-pub struct Slice<'a, T> {
-    pub base: Val<*const T>,
-    pub len: Val<usize>,
-    pub _p: PhantomData<&'a [T]>,
-}
-
-impl<T> Slice<'_, T> {
-    pub fn len(&self) -> Val<usize> {
-        self.len
-    }
-
-    pub fn get(&self, idx: impl AsVal<Ty = usize>) -> Ref<T> {
-        // TODO bound checks?
-        let offset = Val::<usize>::from(self.base) + idx.value() * size_of::<T>();
-        let ptr = unsafe { offset.transmute() };
-        Ref::new(ptr, 0)
-    }
-}
-
-impl<'a, T> Param for &'a [T] {
-    type Ty = Slice<'a, T>;
-
-    fn initialize_param_at(ctx: &mut FnCtx, idxs: &mut impl Iterator<Item = usize>) -> Self::Ty {
-        let len = usize::initialize_param_at(ctx, idxs);
-        let base = <*const T>::initialize_param_at(ctx, idxs);
-        Slice {
-            base: base.addr.as_val(ctx),
-            len: len.as_val(ctx),
-            _p: PhantomData,
         }
     }
 }

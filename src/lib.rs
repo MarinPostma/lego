@@ -3,7 +3,6 @@ mod primitive;
 mod ctx;
 mod func;
 mod arithmetic;
-mod datatype;
 mod refs;
 mod proxy;
 mod control_flow;
@@ -13,6 +12,9 @@ mod abi_params;
 mod cmp;
 pub mod ffi;
 mod vec;
+mod iterator;
+mod slice;
+mod data_struct;
 
 pub mod prelude {
     pub use crate::control_flow::if_then_else::{If, FlowControl, ControlFlow, IfCtx};
@@ -25,7 +27,7 @@ pub mod prelude {
     pub use crate::abi_params::ToAbiParams;
 
     pub use crate::proxy::{Ref, RefMut, Proxy};
-    pub use crate::proxy::Slice;
+    pub use crate::slice::Slice;
 
     pub use crate::refs::JitSafe;
     pub use crate::func::IntoHostFn;
@@ -34,6 +36,7 @@ pub mod prelude {
     pub use crate::ctx::Ctx;
 
     pub use crate::arithmetic::*;
+    pub use crate::iterator::{JIterator, IntoJiter};
 
     pub use lego_macros::lego;
 }

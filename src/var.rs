@@ -29,6 +29,16 @@ impl<T> Var<T> {
         })
     }
 
+    pub fn decl() -> Self 
+        where T: Primitive,
+    {
+        with_ctx(|ctx| {
+            let var = ctx.declare_var();
+            ctx.builder().declare_var(var, T::ty());
+            Self::from_variable(var)
+        })
+    }
+
     pub fn assign(&mut self, val: impl AsVal<Ty = T>) {
         with_ctx(|ctx| {
             self.assign_ctx(ctx, val);
