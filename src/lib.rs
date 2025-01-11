@@ -14,15 +14,14 @@ pub mod ffi;
 mod vec;
 mod iterator;
 mod slice;
-mod data_struct;
 
 pub mod prelude {
-    pub use crate::control_flow::if_then_else::{If, FlowControl, ControlFlow, IfCtx};
+    // pub use crate::control_flow::if_then_else::{If, FlowControl, ControlFlow, IfCtx};
     pub use crate::cmp::Compare;
     pub use crate::val::{Val, AsVal};
     pub use crate::var::Var;
 
-    pub use crate::control_flow::while_loop::{do_while, WhileCtx};
+    // pub use crate::control_flow::while_loop::{do_while, WhileCtx};
     pub use crate::primitive::Primitive;
     pub use crate::abi_params::ToAbiParams;
 

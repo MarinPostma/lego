@@ -1,27 +1,35 @@
 use cranelift::prelude::{InstBuilder as _, IntCC};
 
+use crate::for_all_primitives;
 use crate::val::{AsVal, Val};
 use crate::func::with_ctx;
 
-impl Compare for Val<usize> {
-    fn eq(self, other: Self) -> Val<bool> {
-        with_ctx(|ctx| {
-            let lhs = self.as_val(ctx);
-            let rhs = other.as_val(ctx);
-            let val = ctx.builder().ins().icmp(IntCC::Equal, lhs.value(), rhs.value());
-            Val::from_value(val)
-        })
-    }
+macro_rules! cmp_var {
+    ($ty:ident) => {
+        impl Compare for Val<$ty> {
+            fn eq(self, other: Self) -> Val<bool> {
+                with_ctx(|ctx| {
+                    let lhs = self.as_val(ctx);
+                    let rhs = other.as_val(ctx);
+                    let val = ctx.builder().ins().icmp(IntCC::Equal, lhs.value(), rhs.value());
+                    Val::from_value(val)
+                })
+            }
 
-    fn neq(self, other: Self) -> Val<bool> {
-        with_ctx(|ctx| {
-            let lhs = self.as_val(ctx);
-            let rhs = other.as_val(ctx);
-            let val = ctx.builder().ins().icmp(IntCC::NotEqual, lhs.value(), rhs.value());
-            Val::from_value(val)
-        })
-    }
+            fn neq(self, other: Self) -> Val<bool> {
+                with_ctx(|ctx| {
+                    let lhs = self.as_val(ctx);
+                    let rhs = other.as_val(ctx);
+                    let val = ctx.builder().ins().icmp(IntCC::NotEqual, lhs.value(), rhs.value());
+                    Val::from_value(val)
+                })
+            }
+        }
+    };
 }
+
+for_all_primitives!(cmp_var);
+
 // impl<T, U, P> Compare<&U> for &T 
 // where
 //     T: AsVal<Ty = P>,

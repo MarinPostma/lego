@@ -23,7 +23,8 @@ impl Val<bool> {
         let (then_val, else_fn) = f();
 
         with_ctx(|ctx| {
-            B::jump_to(then_val, ctx, merge_block);
+            // B::jump_to(then_val, ctx, merge_block);
+            ctx.builder().ins().jump(merge_block, &then_val.to_block_values());
             ctx.builder().switch_to_block(else_block);
             ctx.builder().seal_block(else_block);
         });
@@ -31,7 +32,8 @@ impl Val<bool> {
         let else_val = else_fn();
 
         with_ctx(|ctx| {
-            B::jump_to(else_val, ctx, merge_block);
+            // B::jump_to(else_val, ctx, merge_block);
+            ctx.builder().ins().jump(merge_block, &else_val.to_block_values());
 
             let b = ctx.builder();
             b.switch_to_block(merge_block);

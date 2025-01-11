@@ -104,7 +104,8 @@ impl Value {
         }
     }
 
-    fn sub(self, other: Value) -> Value { match (self, other) {
+    fn sub(self, other: Value) -> Value {
+        match (self, other) {
             (Value::Int(lhs), Value::Int(rhs)) => Value::Int(lhs - rhs),
             _ => unreachable!("invalid add"),
         }
@@ -112,7 +113,7 @@ impl Value {
 
     fn eq(self, other: Value) -> Value {
         match (self, other) {
-            (Value::Int(lhs), Value::Int(rhs)) => Value::Bool(lhs.eq(&rhs)),
+            (Value::Int(lhs), Value::Int(rhs)) => Value::Bool(lhs.eq(rhs)),
             _ => unreachable!("invalid add"),
         }
     }
@@ -125,11 +126,11 @@ impl Value {
     }
 }
 
-
 // TODO: if cflow sucks
 
 fn eval_if(list: &[Sexp], env: &mut Env) -> Value {
-    eval_expression.fn_call((&list[0], env))
+    eval_expression
+        .fn_call((&list[0], env))
         .into_bool()
         .then(|| {
             eval_expression(&list[1], env);
@@ -162,23 +163,25 @@ struct Lambda {
 
 fn parse_lambda(s: &Sexp) -> Lambda {
     match s {
-        Sexp::List(list) => {
-            match &list[0] {
-                Sexp::Atom(Atom::Ident(i)) if i == "lambda"=> {
-                    let params = match &list[1] {
-                        Sexp::Atom(Atom::ArrayLit(list)) if list.iter().all(|it| it.as_ident().is_some()) => {
-                            list.iter().map(|it| it.as_ident().unwrap().to_string()).collect()
-                        },
-                        _ => panic!(),
-                    };
-
-                    Lambda {
-                        params,
-                        body: list[2].clone(),
+        Sexp::List(list) => match &list[0] {
+            Sexp::Atom(Atom::Ident(i)) if i == "lambda" => {
+                let params = match &list[1] {
+                    Sexp::Atom(Atom::ArrayLit(list))
+                        if list.iter().all(|it| it.as_ident().is_some()) =>
+                    {
+                        list.iter()
+                            .map(|it| it.as_ident().unwrap().to_string())
+                            .collect()
                     }
-                },
-                _ => panic!(),
+                    _ => panic!(),
+                };
+
+                Lambda {
+                    params,
+                    body: list[2].clone(),
+                }
             }
+            _ => panic!(),
         },
         Sexp::Atom(atom) => todo!(),
     }
@@ -189,25 +192,17 @@ fn eval_foreach(s: &[Sexp], env: &mut Env) -> Value {
     let lambda = parse_lambda(&s[0]);
     match arr {
         Value::IntArray(slice) => {
-            let len = slice.len();
-            let mut i = Var::new(0usize);
-            let s = slice.as_slice();
-            lego::prelude::do_while::<()>(|__ctx__| {
-                while __ctx__.cond(|| i.neq(&len)) {
-                    {
-                        let it = Value::Int(s.get(i).deref());
-                        assert_eq!(lambda.params.len(), 1);
-                        let tmp = env.vars.insert(lambda.params[0].clone(), it);
+            slice.as_slice().into_jiter().for_each(|it| {
+                assert_eq!(lambda.params.len(), 1);
+                let tmp = env
+                    .vars
+                    .insert(lambda.params[0].clone(), Value::Int(it.deref()));
 
-                        eval_expression(&lambda.body, env);
+                eval_expression(&lambda.body, env);
 
-                        if let Some(((name,  _), tmp)) = env.vars.remove_entry(&lambda.params[0]).zip(tmp) {
-                            env.vars.insert(name, tmp);
-                        }
-                        i += 1usize;
-                    }
+                if let Some(((name, _), tmp)) = env.vars.remove_entry(&lambda.params[0]).zip(tmp) {
+                    env.vars.insert(name, tmp);
                 }
-                lego::prelude::ControlFlow::Break(())
             });
 
             Value::Null
@@ -227,17 +222,15 @@ fn eval_expression(s: &Sexp, env: &mut Env) -> Value {
                     let lhs = eval_expression(&list[1], env);
                     let rhs = eval_expression(&list[2], env);
                     lhs.eq(rhs)
-                },
+                }
                 // "if" => eval_if::<u64>(list, env),
                 "foreach" => eval_foreach(&list[1..], env),
                 "print" => {
                     let val = eval_expression(&list[1], env);
                     print(val);
                     Value::Null
-                },
-                "if" => {
-                    eval_if(&list[1..], env)
                 }
+                "if" => eval_if(&list[1..], env),
                 _ => todo!(),
             },
             _ => todo!(),
@@ -295,7 +288,12 @@ fn print(t: Value) {
 
 fn main() {
     // (select (+ foo 1) (+ foo bar) (from (foo u64) (bar u64)))
-    let expr = "(foreach (lambda [x] (if (= x 2) (print x) (print (+ 2 x)))) [1 1 (+ 1 1)])";
+    let expr = "(foreach 
+                (lambda [x] 
+                    (if (= x 2)
+                        (print x)
+                        (print (+ 2 x))))
+                [1 1 (+ 1 1)])";
     let e = dbg!(Parser::parse(expr));
 
     let mut ctx = Ctx::builder().build();
@@ -304,7 +302,6 @@ fn main() {
     };
     let f = ctx.func::<(usize, usize), ()>(|_row| {
         eval_expression(&e[0], &mut env);
-        ControlFlow::Break(())
     });
 
     let f = ctx.get_compiled_function(f);

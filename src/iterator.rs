@@ -40,8 +40,8 @@ pub trait JIterator {
         Self: Sized,
     {
         let mut has_more = Var::new(true);
-        do_while2(|| {
-            (has_more.value(), || {
+        do_while2((), || {
+            (has_more.value(), |_| {
                 let (more, val) = self.next();
                 has_more.assign(more);
                 f(val);
@@ -56,8 +56,8 @@ pub trait JIterator {
         Self: Sized,
     {
         let mut has_more = Var::new(true);
-        do_while2(|| {
-            (has_more.value(), || {
+        do_while2(init, || {
+            (has_more.value(), |init| {
                 let (more, val) = self.next();
                 has_more.assign(more);
                 f(init, val)
@@ -155,7 +155,7 @@ where
         let mut has_more = Var::new(true);
         let mut it = None;
         let mut cont = Var::new(true);
-        do_while2(|| (cont.value(), || {
+        do_while2((), || (cont.value(), |_| {
             let (more, val) = self.inner.next();
             let take = (self.f)(&val);
             it = Some(val);

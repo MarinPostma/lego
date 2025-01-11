@@ -7,7 +7,7 @@ use cranelift_frontend::{FunctionBuilder, Variable};
 use cranelift_jit::JITModule;
 use cranelift_module::{FuncId, Module};
 
-use crate::prelude::ControlFlow;
+// use crate::prelude::ControlFlow;
 use crate::proxy::{Ptr, PtrMut};
 use crate::{for_all_primitives, for_all_tuples, maybe_paren};
 use crate::primitive::Primitive;
@@ -104,7 +104,7 @@ where
     R: Results,
 {
     pub(crate) fn new<B>(ctx: &mut Ctx, body: B) -> Self
-    where B: FnOnce(P::Values) -> ControlFlow::<R::Results, R::Results>,
+    where B: FnOnce(P::Values) -> R::Results,
     {
         P::to_abi_params(&mut ctx.ctx.func.signature.params);
         R::to_abi_params(&mut ctx.ctx.func.signature.returns);
@@ -128,16 +128,7 @@ where
             body(params)
         });
 
-        match ret {
-            ControlFlow::Break(ret) => {
-                ret.return_(&mut fn_ctx);
-            },
-            ControlFlow::Ret(ret) => {
-                ret.return_(&mut fn_ctx);
-            },
-            ControlFlow::Continue => todo!(),
-            ControlFlow::Preempt => todo!(),
-        }
+        ret.return_(&mut fn_ctx);
 
         fn_ctx.builder.finalize();
 

@@ -1,6 +1,7 @@
 use std::marker::PhantomData;
 
 use crate::cmp::Compare;
+use crate::prelude::IntoJiter;
 use crate::val::{AsVal, Val};
 use crate::proxy::Ref;
 use crate::func::{FnCtx, Param};
@@ -24,8 +25,13 @@ impl<'a, T> Slice<'a, T> {
         let ptr = unsafe { offset.transmute() };
         Ref::new(ptr, 0)
     }
+}
 
-    pub fn into_iter(self) -> SliceIter<'a, T> {
+impl<'a, T> IntoJiter for Slice<'a, T> {
+    type Iter = SliceIter<'a, T>;
+    type Item = Ref<'a, T>;
+
+    fn into_jiter(self) -> Self::Iter {
         SliceIter {
             index: Var::new(0usize),
             slice: self,
@@ -56,9 +62,8 @@ impl<'a, T> JIterator for SliceIter<'a, T> {
     type Item = Ref<'a, T>;
 
     fn next(&mut self) -> (Val<bool>, Self::Item) {
-        todo!()
-        // let ret = self.slice.get(self.index);
-        // self.index += 1usize;
-        // ret
+        let ret = self.slice.get(self.index);
+        self.index += 1usize;
+        (self.index.value().neq(self.slice.len()), ret)
     }
 }
