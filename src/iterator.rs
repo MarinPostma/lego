@@ -32,7 +32,7 @@ pub trait JIterator {
         Filter { inner: self, f }
     }
 
-    fn for_each<F>(mut self, f: F)
+    fn for_each<F>(self, f: F)
     where
         F: FnOnce(Self::Item),
         Self::Item: BlockRet,
@@ -111,8 +111,8 @@ where
     type Item = B;
 
     fn next(&mut self) -> (Val<bool>, Self::Item) {
-        let (has_more, val) = self.inner.next();
-        (has_more, (self.f)(val))
+        let (has_it, val) = self.inner.next();
+        (has_it, (self.f)(val))
     }
 }
 
