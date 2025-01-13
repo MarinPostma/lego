@@ -32,51 +32,20 @@ pub trait JIterator {
         Filter { inner: self, f }
     }
 
-    fn for_each<F>(mut self, mut f: F)
+    fn for_each<F>(mut self, f: F)
     where
         F: FnOnce(Self::Item),
         Self::Item: BlockRet,
         Self: Sized,
     {
-        let [header, body, exit] = with_ctx(|ctx| {
-            let [header, body, exit] = ctx.create_blocks();
-            ctx.builder().ins().jump(header, &[]);
-            Self::Item::push_param_ty(ctx, body);
-            ctx.builder().switch_to_block(header);
-            [header, body, exit]
-        });
-
-        let (has_it, it) = self.next();
-
-        let it = with_ctx(|ctx| {
-            let mut then_params = Vec::new();
-            it.to_block_values(&mut then_params);
-            ctx.builder().ins().brif(
-                has_it.value,
-                body,
-                &then_params,
-                exit,
-                &[]);
-
-            ctx.builder().switch_to_block(body);
-            ctx.builder().seal_block(body);
-            Self::Item::read_from_ret(&mut ctx.builder().block_params(body).iter().copied())
-        });
-
-        f(it);
-
-        with_ctx(|ctx| {
-            ctx.builder().ins().jump(header, &[]);
-
-            ctx.builder().seal_block(header);
-            ctx.builder().switch_to_block(exit);
-            ctx.builder().seal_block(exit);
-        });
+        self.fold((), |_, it| {
+            f(it)
+        })
     }
 
     fn fold<F, B>(mut self, init: B, f: F) -> B
     where
-        B: AsVal + BlockRet,
+        B: BlockRet,
         F: FnOnce(B, Self::Item) -> B,
         Self: Sized,
         Self::Item: BlockRet,
@@ -86,8 +55,9 @@ pub trait JIterator {
             B::push_param_ty(ctx, header);
             B::push_param_ty(ctx, exit);
             <(B, Self::Item)>::push_param_ty(ctx, body);
-            let params = &[init.as_val(ctx).value()];
-            ctx.builder().ins().jump(header, params);
+            let mut params = Vec::new();
+            init.to_block_values(&mut params);
+            ctx.builder().ins().jump(header, &params);
             ctx.builder().switch_to_block(header);
             [header, body, exit]
         });
@@ -97,14 +67,15 @@ pub trait JIterator {
         let (acc, it) = with_ctx(|ctx| {
             let mut then_params = Vec::new();
             let init = B::read_from_ret(&mut ctx.builder().block_params(header).iter().copied());
-            let else_params = &[init.as_val(ctx).value()];
+            let mut params = Vec::new();
+            init.to_block_values(&mut params);
             (init, it).to_block_values(&mut then_params);
             ctx.builder().ins().brif(
                 has_it.value,
                 body,
                 &then_params,
                 exit,
-                else_params);
+                &params);
 
             ctx.builder().switch_to_block(body);
             ctx.builder().seal_block(body);
@@ -114,8 +85,9 @@ pub trait JIterator {
         let acc = f(acc, it);
 
         with_ctx(|ctx| {
-            let params = &[acc.as_val(ctx).value()];
-            ctx.builder().ins().jump(header, params);
+            let mut params = Vec::new();
+            acc.to_block_values(&mut params);
+            ctx.builder().ins().jump(header, &params);
 
             ctx.builder().seal_block(header);
             ctx.builder().switch_to_block(exit);
