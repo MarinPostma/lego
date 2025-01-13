@@ -10,25 +10,28 @@ fn main() {
     let before = Instant::now();
     let main = ctx.func::<(&[u64], &[u64]), i32>(|(it1, _it2)| {
         let print = (|v: u64| println!("val: {v}")).into_host_fn();
-        it1
+        // it1
+        //     .into_jiter()
+        //     // .filter(|it| {
+        //     //     (it.deref() % 2).eq(0u64.value())
+        //     // })
+        //     // .map(|it| it.deref() + 1)
+        //     .for_each(|it| {
+        //         print.call(it.deref());
+        //     });
+
+        let sum = (1..5)
             .into_jiter()
             // .filter(|it| {
             //     (it.deref() % 2).eq(0u64.value())
             // })
             // .map(|it| it.deref() + 1)
-            .for_each(|it| {
-                print.call(it.deref());
+            .fold(0u64.value(), |acc, it| {
+                print.call(it);
+                acc + it
             });
 
-        (1..5)
-            .into_jiter()
-            // .filter(|it| {
-            //     (it.deref() % 2).eq(0u64.value())
-            // })
-            // .map(|it| it.deref() + 1)
-            .for_each(|it| {
-                print.call(it);
-            });
+        print.call(sum);
 
         0.value()
     });

@@ -5,6 +5,7 @@ use cranelift::prelude::InstBuilder;
 use crate::cmp::Compare;
 use crate::control_flow::while_loop::do_while2;
 use crate::control_flow::BlockRet;
+use crate::ctx;
 use crate::func::with_ctx;
 use crate::prelude::Primitive;
 use crate::val::{AsVal, Val};
@@ -33,7 +34,7 @@ pub trait JIterator {
 
     fn for_each<F>(mut self, mut f: F)
     where
-        F: FnMut(Self::Item),
+        F: FnOnce(Self::Item),
         Self::Item: BlockRet,
         Self: Sized,
     {
@@ -78,14 +79,48 @@ pub trait JIterator {
         B: AsVal + BlockRet,
         F: FnOnce(B, Self::Item) -> B,
         Self: Sized,
+        Self::Item: BlockRet,
     {
-        let mut has_more = Var::new(true);
-        do_while2(init, |_init| {
-            (has_more.value(), |init| {
-                let (more, val) = self.next();
-                has_more.assign(more);
-                f(init, val)
-            })
+        let [header, body, exit] = with_ctx(|ctx| {
+            let [header, body, exit] = ctx.create_blocks();
+            B::push_param_ty(ctx, header);
+            B::push_param_ty(ctx, exit);
+            <(B, Self::Item)>::push_param_ty(ctx, body);
+            let params = &[init.as_val(ctx).value()];
+            ctx.builder().ins().jump(header, params);
+            ctx.builder().switch_to_block(header);
+            [header, body, exit]
+        });
+
+        let (has_it, it) = self.next();
+
+        let (acc, it) = with_ctx(|ctx| {
+            let mut then_params = Vec::new();
+            let init = B::read_from_ret(&mut ctx.builder().block_params(header).iter().copied());
+            let else_params = &[init.as_val(ctx).value()];
+            (init, it).to_block_values(&mut then_params);
+            ctx.builder().ins().brif(
+                has_it.value,
+                body,
+                &then_params,
+                exit,
+                else_params);
+
+            ctx.builder().switch_to_block(body);
+            ctx.builder().seal_block(body);
+            <(B, Self::Item)>::read_from_ret(&mut ctx.builder().block_params(body).iter().copied())
+        });
+
+        let acc = f(acc, it);
+
+        with_ctx(|ctx| {
+            let params = &[acc.as_val(ctx).value()];
+            ctx.builder().ins().jump(header, params);
+
+            ctx.builder().seal_block(header);
+            ctx.builder().switch_to_block(exit);
+            ctx.builder().seal_block(exit);
+            B::read_from_ret(&mut ctx.builder().block_params(exit).iter().copied())
         })
     }
 }
