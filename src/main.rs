@@ -8,25 +8,33 @@ fn main() {
     let mut ctx = builder.build();
 
     let before = Instant::now();
-    let main = ctx.func::<usize, i32>(|_val| {
-        let print = (|v: usize| println!("val: {v}")).into_host_fn();
-        let sum = (0usize..30)
+    let main = ctx.func::<(&[u64], &[u64]), i32>(|(it1, _it2)| {
+        let print = (|v: u64| println!("val: {v}")).into_host_fn();
+        it1
             .into_jiter()
-            .filter(|it| (*it % 2usize).eq(0usize.value()))
-            .map(|it| it * 2)
-            .map(|it| it + 1)
-            .map(|it| {
-                // print.call(it);
-                it / 3
-            })
-            .fold(Val::new(0usize), |acc, it| acc + it);
+            // .filter(|it| {
+            //     (it.deref() % 2).eq(0u64.value())
+            // })
+            // .map(|it| it.deref() + 1)
+            .for_each(|it| {
+                print.call(it.deref());
+            });
 
-        print.call(sum);
+        (1..5)
+            .into_jiter()
+            // .filter(|it| {
+            //     (it.deref() % 2).eq(0u64.value())
+            // })
+            // .map(|it| it.deref() + 1)
+            .for_each(|it| {
+                print.call(it);
+            });
+
         0.value()
     });
     let main = ctx.get_compiled_function(main);
     dbg!(before.elapsed());
 
-    dbg!();
-    dbg!(main.call(12));
+    let items = &[1, 2, 3, 4];
+    dbg!(main.call((items, items)));
 }

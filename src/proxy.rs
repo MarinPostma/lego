@@ -14,7 +14,7 @@ impl<T: Primitive> Ref<'_, T> {
             T::ty(),
             MemFlags::new(),
             self.addr.value(),
-            self.offset,
+            0,
         ))
     }
 
@@ -28,8 +28,8 @@ pub struct RefMut<'a, T>(Ref<'a, T>);
 
 impl<T> RefMut<'_, T> {
     #[doc(hidden)]
-    pub fn new(addr: Val<*mut T>, offset: i32) -> Self {
-        Self(Ref::new(addr.into(), offset))
+    pub fn new(addr: Val<*mut T>) -> Self {
+        Self(Ref::new(addr.into()))
     }
 }
 
@@ -45,7 +45,7 @@ impl<T> RefMut<'_, T> {
     fn store(&mut self, ctx: &mut FnCtx, val: Value) {
         ctx.builder
             .ins()
-            .store(MemFlags::new(), val, self.addr.value(), self.offset);
+            .store(MemFlags::new(), val, self.addr.value(), 0);
     }
 
     pub fn put(&mut self, val: impl AsVal<Ty = T>) {
@@ -58,8 +58,7 @@ impl<T> RefMut<'_, T> {
 
 #[derive(Clone, Copy)]
 pub struct Ref<'a, T> {
-    addr: Val<*const T>,
-    offset: i32,
+    pub(crate) addr: Val<*const T>,
     _pth: PhantomData<&'a T>,
 }
 
@@ -94,28 +93,15 @@ impl<T> Ref<'_, T> {
         self.addr.into()
     }
 
-    #[doc(hidden)]
-    pub fn offset(&self) -> i32 {
-        self.offset
-    }
 
-    fn addr(&self, ctx: &mut FnCtx) -> Val<usize> {
-        if self.offset == 0 {
-            self.addr.into()
-        } else {
-            let offset = ctx
-                .builder()
-                .ins()
-                .iconst(usize::ty(), self.offset.to_i64());
-            Val::from_value(ctx.builder().ins().iadd(self.addr.value(), offset))
-        }
+    fn addr(&self, _ctx: &mut FnCtx) -> Val<usize> {
+        self.addr.into()
     }
 
     #[doc(hidden)]
-    pub fn new(addr: Val<*const T>, offset: i32) -> Self {
+    pub fn new(addr: Val<*const T>) -> Self {
         Self {
             addr,
-            offset,
             _pth: PhantomData,
         }
     }
@@ -168,7 +154,7 @@ fn drop_ptr<T>(p: *mut T) {
 
 impl<T> Proxy<T> {
     pub fn get_mut(&mut self) -> RefMut<T> {
-        RefMut::new(self.ptr.addr, 0)
+        RefMut::new(self.ptr.addr)
     }
 
     pub fn ctor(ctor: fn() -> T) -> Self {
@@ -202,7 +188,7 @@ impl<T> Proxy<T> {
     }
 
     pub fn get_ref(&self) -> Ref<T> {
-        Ref::new(self.ptr.addr.into(), 0)
+        Ref::new(self.ptr.addr.into())
     }
 }
 

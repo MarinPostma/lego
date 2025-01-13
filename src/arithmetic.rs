@@ -1,4 +1,4 @@
-use std::ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Rem, Shl, Shr, Sub};
+use std::ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Not, Rem, Shl, Shr, Sub};
 
 use cranelift::prelude::{InstBuilder, Value};
 
@@ -89,6 +89,16 @@ impl BitAnd<Val<bool>> for Val<bool> {
 
     fn bitand(self, rhs: Val<bool>) -> Self::Output {
         with_ctx(|ctx| Val::from_value(ctx.builder().ins().band(self.value(), rhs.value())))
+    }
+}
+
+impl Not for Val<bool> {
+    type Output = Val<bool>;
+
+    fn not(self) -> Self::Output {
+        with_ctx(|ctx| {
+            Val::from_value(ctx.builder.ins().bnot(self.value))
+        })
     }
 }
 

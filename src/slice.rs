@@ -23,7 +23,7 @@ impl<'a, T> Slice<'a, T> {
         // TODO bound checks?
         let offset = Val::<usize>::from(self.base) + idx.value() * size_of::<T>();
         let ptr = unsafe { offset.transmute() };
-        Ref::new(ptr, 0)
+        Ref::new(ptr)
     }
 }
 
@@ -62,8 +62,8 @@ impl<'a, T> JIterator for SliceIter<'a, T> {
     type Item = Ref<'a, T>;
 
     fn next(&mut self) -> (Val<bool>, Self::Item) {
-        let ret = self.slice.get(self.index);
+        let ret = (self.index.value().neq(self.slice.len()), self.slice.get(self.index));
         self.index += 1usize;
-        (self.index.value().neq(self.slice.len()), ret)
+        ret
     }
 }

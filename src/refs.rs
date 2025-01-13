@@ -39,7 +39,7 @@ impl<'a, T> Param for &'a T {
             .declare_var(variable, ctx.module.target_config().pointer_type());
         ctx.builder.def_var(variable, val);
 
-        Ref::new(Val::from_value(val), 0)
+        Ref::new(Val::from_value(val))
     }
 }
 
@@ -56,6 +56,6 @@ impl<'a, T> Param for &'a mut T {
             .declare_var(variable, ctx.module.target_config().pointer_type());
         ctx.builder.def_var(variable, val);
 
-        RefMut::new(Val::from_value(val), 0)
+        RefMut::new(Val::from_value(val))
     }
 }

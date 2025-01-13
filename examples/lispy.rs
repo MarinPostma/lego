@@ -126,8 +126,6 @@ impl Value {
     }
 }
 
-// TODO: if cflow sucks
-
 fn eval_if(list: &[Sexp], env: &mut Env) -> Value {
     eval_expression
         .fn_call((&list[0], env))
@@ -294,7 +292,7 @@ fn main() {
                         (print x)
                         (print (+ 2 x))))
                 [1 1 (+ 1 1)])";
-    let e = dbg!(Parser::parse(expr));
+    let e = Parser::parse(expr);
 
     let mut ctx = Ctx::builder().build();
     let mut env = Env {
@@ -305,5 +303,5 @@ fn main() {
     });
 
     let f = ctx.get_compiled_function(f);
-    dbg!(f.call((10, 10)));
+    f.call((10, 10));
 }

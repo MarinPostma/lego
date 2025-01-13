@@ -14,6 +14,7 @@ impl Val<bool> {
         E: FnOnce() -> B,
         B: BlockRet,
     {
+        let mut params = Vec::new();
         let [then_block, else_block, merge_block] = with_ctx(make_cond_blocks::<B>);
 
         with_ctx(|ctx| {
@@ -26,26 +27,28 @@ impl Val<bool> {
         let (then_val, else_fn) = f();
 
         with_ctx(|ctx| {
-            // B::jump_to(then_val, ctx, merge_block);
+            then_val.to_block_values(&mut params);
             ctx.builder()
                 .ins()
-                .jump(merge_block, &then_val.to_block_values());
+                .jump(merge_block, &params);
             ctx.builder().switch_to_block(else_block);
             ctx.builder().seal_block(else_block);
+            params.clear();
         });
 
         let else_val = else_fn();
 
         with_ctx(|ctx| {
-            // B::jump_to(else_val, ctx, merge_block);
+            else_val.to_block_values(&mut params);
             ctx.builder()
                 .ins()
-                .jump(merge_block, &else_val.to_block_values());
+                .jump(merge_block, &params);
+            params.clear();
 
             let b = ctx.builder();
             b.switch_to_block(merge_block);
             b.seal_block(merge_block);
-            B::read_from_ret(ctx, merge_block)
+            B::read_from_ret(&mut ctx.builder().block_params(merge_block).iter().copied())
         })
     }
 }

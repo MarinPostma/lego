@@ -9,7 +9,7 @@ use crate::primitive::Primitive;
 use crate::proxy::PtrMut;
 
 pub struct Val<T> {
-    value: Value,
+    pub value: Value,
     _pth: PhantomData<T>,
 }
 

@@ -10,16 +10,17 @@ pub trait Function {
     fn call(&self, params: Self::Params) -> Self::Result;
 }
 
+#[derive(Debug)]
 pub struct Bottom;
 
-pub trait ToFFIFunctionParams {
+pub trait ToFFIFunctionParams: fmt::Debug {
     unsafe fn call<R>(self, f: *const u8) -> R;
 }
 
 pub trait ToFFIParams: fmt::Debug {
-    type Out<T>;
+    type Out<T: fmt::Debug>: std::fmt::Debug;
 
-    fn to_ffi_params<T>(self, t: T) -> Self::Out<T>;
+    fn to_ffi_params<T: fmt::Debug>(self, t: T) -> Self::Out<T>;
 }
 
 trait Primitive: fmt::Debug {}
@@ -37,11 +38,11 @@ impl<T: Primitive> ToFFIFunctionParams for Param<Bottom, T> {
     }
 }
 
-impl<T: Primitive, U: Primitive> ToFFIFunctionParams for Param<Param<Bottom, T>, U> {
+impl<T: Primitive + fmt::Debug, U: Primitive + fmt::Debug> ToFFIFunctionParams for Param<Param<Bottom, T>, U> {
     unsafe fn call<R>(self, f: *const u8) -> R {
         let Param(Param(_, a), b) = self;
-        let f = std::mem::transmute::<*const u8, extern "C" fn(T, U) -> R>(f);
-        f(a, b)
+        let f = std::mem::transmute::<*const u8, extern "C" fn(U, T) -> R>(f);
+        f(b, a)
     }
 }
 
@@ -50,23 +51,22 @@ impl<T: Primitive, U: Primitive, V: Primitive> ToFFIFunctionParams
 {
     unsafe fn call<R>(self, f: *const u8) -> R {
         let Param(Param(Param(_, a), b), c) = self;
-        dbg!((&a, &b, &c));
-        let f = std::mem::transmute::<*const u8, extern "C" fn(T, U, V) -> R>(f);
-        f(a, b, c)
+        let f = std::mem::transmute::<*const u8, extern "C" fn(V, U, T) -> R>(f);
+        f(c, b, a)
     }
 }
 
-impl<T: Primitive, U: Primitive, V: Primitive, W: Primitive> ToFFIFunctionParams
+impl<T: Primitive + fmt::Debug, U: Primitive + fmt::Debug, V: Primitive + fmt::Debug, W: Primitive + fmt::Debug> ToFFIFunctionParams
     for Param<Param<Param<Param<Bottom, T>, U>, V>, W>
 {
     unsafe fn call<R>(self, f: *const u8) -> R {
         let Param(Param(Param(Param(_, a), b), c), d) = self;
-        dbg!((&a, &b, &c, &d));
         let f = std::mem::transmute::<*const u8, extern "C" fn(W, V, U, T) -> R>(f);
         f(d, c, b, a)
     }
 }
 
+#[derive(Debug)]
 pub struct Param<T, U>(T, U);
 
 pub trait ToTuple {
@@ -74,33 +74,33 @@ pub trait ToTuple {
 }
 
 impl ToFFIParams for u64 {
-    type Out<T> = Param<T, u64>;
+    type Out<T: fmt::Debug> = Param<T, u64>;
 
-    fn to_ffi_params<T>(self, t: T) -> Self::Out<T> {
+    fn to_ffi_params<T: fmt::Debug>(self, t: T) -> Self::Out<T> {
         Param(t, self)
     }
 }
 
 impl ToFFIParams for i32 {
-    type Out<T> = Param<T, i32>;
+    type Out<T: fmt::Debug> = Param<T, i32>;
 
-    fn to_ffi_params<T>(self, t: T) -> Self::Out<T> {
+    fn to_ffi_params<T: fmt::Debug>(self, t: T) -> Self::Out<T> {
         Param(t, self)
     }
 }
 
 impl ToFFIParams for usize {
-    type Out<T> = Param<T, usize>;
+    type Out<T: fmt::Debug> = Param<T, usize>;
 
-    fn to_ffi_params<T>(self, t: T) -> Self::Out<T> {
+    fn to_ffi_params<T: fmt::Debug>(self, t: T) -> Self::Out<T> {
         Param(t, self)
     }
 }
 
 impl<T: fmt::Debug> ToFFIParams for &[T] {
-    type Out<U> = <usize as ToFFIParams>::Out<<usize as ToFFIParams>::Out<U>>;
+    type Out<U: fmt::Debug> = <usize as ToFFIParams>::Out<<usize as ToFFIParams>::Out<U>>;
 
-    fn to_ffi_params<U>(self, t: U) -> Self::Out<U> {
+    fn to_ffi_params<U: fmt::Debug>(self, t: U) -> Self::Out<U> {
         Param(Param(t, self.as_ptr() as usize), self.len())
     }
 }
@@ -110,9 +110,9 @@ where
     A: ToFFIParams,
     B: ToFFIParams,
 {
-    type Out<T> = A::Out<B::Out<T>>;
+    type Out<T: fmt::Debug> = A::Out<B::Out<T>>;
 
-    fn to_ffi_params<T>(self, t: T) -> Self::Out<T> {
+    fn to_ffi_params<T: fmt::Debug>(self, t: T) -> Self::Out<T> {
         self.0.to_ffi_params(self.1.to_ffi_params(t))
     }
 }
@@ -123,9 +123,9 @@ where
     B: ToFFIParams,
     C: ToFFIParams,
 {
-    type Out<T> = A::Out<B::Out<C::Out<T>>>;
+    type Out<T: fmt::Debug> = A::Out<B::Out<C::Out<T>>>;
 
-    fn to_ffi_params<T>(self, t: T) -> Self::Out<T> {
+    fn to_ffi_params<T: fmt::Debug>(self, t: T) -> Self::Out<T> {
         self.0
             .to_ffi_params(self.1.to_ffi_params(self.2.to_ffi_params(t)))
     }
