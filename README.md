@@ -312,3 +312,120 @@ block3:
 ```
 
 This simple example is just to give you a sense of how close to _actual_ Rust writing lego functions feels. We benefit from rust's type safety, operator overloading, and the high-level construct from lego let us write very simple code, that specializes **at runtime**.
+
+To fully grasp lego's power, it is necessary to understand that whatever is in the `func` closure's body is effectively [partially evaluated](https://en.wikipedia.org/wiki/Partial_evaluation): every expression that can be evaluated when the closure is invoked is evaluated. This means that we can combine rust code that is evaluated right away to specialize rust code that will be evaluated _later_ (when the native function is invoked). Let's illustrate that:
+```rust
+fn main() {
+    let builder = Ctx::builder();
+    let mut ctx = builder.build();
+
+    // we get n at runtime
+    let n = std::env::args().nth(1).unwrap().parse::<i32>().unwrap();
+
+    // My pow generate specialed pow(x, n) for an arbitrary n, known at runtime
+    let my_pow = ctx.func::<i32, i32>(|x| {
+        let mut out = Var::new(x);
+        for _ in 1..n {
+            out *= x;
+        }
+
+        out.value()
+    });
+
+    let main = ctx.get_compiled_function(my_pow);
+
+    let x = std::env::args().nth(2).unwrap().parse::<i32>().unwrap();
+
+    println!("{}", main.call(x));
+    /// cargo r -- 3 3; prints 27
+}
+});
+```
+This is the generated asm with `x = 3 and n = 3`:
+```asm
+  pushq   %rbp
+  unwind PushFrameRegs { offset_upward_to_caller_sp: 16 }
+  movq    %rsp, %rbp
+  unwind DefineNewFrame { offset_upward_to_caller_sp: 16, offset_downward_to_clobbers: 0 }
+block0:
+  movq    %rdi, %rax
+  imull   %eax, %edi, %eax
+  imull   %eax, %edi, %eax
+  movq    %rbp, %rsp
+  popq    %rbp
+  ret
+```
+
+This is the generated asm with `x = 3 and n = 4`:
+```asm
+  pushq   %rbp
+  unwind PushFrameRegs { offset_upward_to_caller_sp: 16 }
+  movq    %rsp, %rbp
+  unwind DefineNewFrame { offset_upward_to_caller_sp: 16, offset_downward_to_clobbers: 0 }
+block0:
+  movq    %rdi, %rax
+  imull   %eax, %edi, %eax
+  imull   %eax, %edi, %eax
+  imull   %eax, %edi, %eax
+  movq    %rbp, %rsp
+  popq    %rbp
+  ret
+```
+
+The consecutive multiplication get unrolled. That's because all the information we need to evaluate the loop is know when we execute the closure.
+
+I have introduced Lego as a multi-stage programming library. So far we can, we've seen two stages:
+- Code that is evaluated to an immediate result within `func`, let's call this stage _runtime compile time_
+- Code that is evaluated when the generated function is invoked: let's call it `runtime runtime`.
+
+But why stop here? We can hook into Rust existing metaprogramming and go one level deeper: we already have a function that generates function at runtime, why note a function that generate functions at compile time that generate functions at runtime?:
+
+```rust
+fn do_pow_spec<T>(ctx: &mut Ctx, n: usize)
+// ignore the type bounds, I'm hoping I can simplify them in the future
+where
+    T: Param + Primitive + FromStr + ToFFIParams + Display + IntMul,
+    T::Out<Bottom>: ToFFIFunctionParams,
+    T::Ty: AsVal<Ty = T> + Copy,
+    Var<T>: MulAssign<T::Ty>,
+{
+    let my_pow = ctx.func::<T, T>(|x| {
+        let mut out = Var::new(x);
+        for _ in 1..n {
+            out *= x;
+        }
+
+        out.value()
+    });
+
+    let x = std::env::args().nth(2).unwrap().parse::<T>().unwrap_or_else(|_| panic!());
+    let res = ctx.get_compiled_function(my_pow).call(x);
+    println!("{res}");
+}
+
+fn main() {
+    let builder = Ctx::builder();
+    let mut ctx = builder.build();
+
+    let spec = std::env::args().nth(3).unwrap();
+
+    let n = std::env::args().nth(1).unwrap().parse::<usize>().unwrap_or_else(|_| panic!());
+
+    match spec.as_str() {
+        "u64" => do_pow_spec::<u64>(&mut ctx, n),
+        "i32" => do_pow_spec::<i32>(&mut ctx, n),
+        _ => panic!("unsupported specialization"),
+    }
+}
+```
+
+`do_pow_spec` introduces a 3rd stage: at compile time, it produces specialization of func for arbitrary integer types, as we can see in main.
+
+## Disclaimer
+
+This work is very experimental. A lot of implementations are missing, the API is not in the shape I want it to be, there're a lot of missing features and likely bugs. This is public for discussion only.
+
+## Inspiration
+- https://dl.acm.org/doi/10.1007/s00778-020-00643-4
+- https://buildit.so/
+- https://link.springer.com/chapter/10.1007/978-3-540-25935-0_3

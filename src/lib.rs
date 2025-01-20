@@ -36,6 +36,7 @@ pub mod prelude {
 
     pub use crate::arithmetic::*;
     pub use crate::iterator::{IntoJiter, JIterator};
+    pub use crate::func::CompiledFunc;
 
     pub use lego_macros::lego;
 }
