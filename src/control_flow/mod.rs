@@ -1,4 +1,4 @@
-use cranelift::prelude::{Block, Value};
+use cranelift::prelude::{Block, InstBuilder, Value};
 
 use crate::func::FnCtx;
 use crate::primitive::Primitive;
@@ -13,6 +13,7 @@ pub trait BlockRet {
     fn push_param_ty(ctx: &mut FnCtx, block: Block);
     fn read_from_ret(block_params: &mut impl Iterator<Item = Value>) -> Self;
     fn to_block_values(&self, out: &mut Vec<Value>);
+    fn null(ctx: &mut FnCtx, out: &mut Vec<Value>);
 }
 
 impl BlockRet for () {
@@ -21,6 +22,8 @@ impl BlockRet for () {
     fn read_from_ret(_block_params: &mut impl Iterator<Item = Value>) -> Self {}
 
     fn to_block_values(&self, _out: &mut Vec<Value>) { }
+
+    fn null(_ctx: &mut FnCtx, _out: &mut Vec<Value>) { }
 }
 
 impl<T: Primitive> BlockRet for Val<T> {
@@ -34,6 +37,10 @@ impl<T: Primitive> BlockRet for Val<T> {
 
     fn to_block_values(&self, out: &mut Vec<Value>) {
         out.push(self.value());
+    }
+
+    fn null(ctx: &mut FnCtx, out: &mut Vec<Value>) {
+        out.push(ctx.builder().ins().iconst(T::ty(), 0));
     }
 }
 
@@ -49,6 +56,10 @@ impl<T> BlockRet for Ref<'_, T> {
 
     fn to_block_values(&self, out: &mut Vec<Value>) {
         out.push(self.addr.value());
+    }
+
+    fn null(ctx: &mut FnCtx, out: &mut Vec<Value>) {
+        out.push(ctx.builder().ins().iconst(<*const T>::ty(), 0));
     }
 }
 
@@ -71,6 +82,11 @@ impl<T, U> BlockRet for (T, U)
     fn to_block_values(&self, out: &mut Vec<Value>) {
         self.0.to_block_values(out);
         self.1.to_block_values(out);
+    }
+
+    fn null(ctx: &mut FnCtx, out: &mut Vec<Value>) {
+        T::null(ctx, out);
+        U::null(ctx, out);
     }
 }
 
@@ -96,5 +112,11 @@ impl<T, U, V> BlockRet for (T, U, V)
         self.0.to_block_values(out);
         self.1.to_block_values(out);
         self.2.to_block_values(out);
+    }
+
+    fn null(ctx: &mut FnCtx, out: &mut Vec<Value>) {
+        T::null(ctx, out);
+        U::null(ctx, out);
+        V::null(ctx, out);
     }
 }

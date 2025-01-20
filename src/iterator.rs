@@ -3,9 +3,7 @@ use std::ops::Range;
 use cranelift::prelude::InstBuilder;
 
 use crate::cmp::Compare;
-use crate::control_flow::while_loop::do_while2;
 use crate::control_flow::BlockRet;
-use crate::ctx;
 use crate::func::with_ctx;
 use crate::prelude::Primitive;
 use crate::val::{AsVal, Val};
@@ -14,7 +12,7 @@ use crate::var::Var;
 pub trait JIterator {
     type Item;
 
-    fn next(&mut self) -> (Val<bool>, Self::Item);
+    fn next(&mut self) -> (Val<bool>, impl FnOnce() -> Self::Item);
 
     fn map<F, B>(self, f: F) -> Map<Self, F>
     where
@@ -54,7 +52,7 @@ pub trait JIterator {
             let [header, body, exit] = ctx.create_blocks();
             B::push_param_ty(ctx, header);
             B::push_param_ty(ctx, exit);
-            <(B, Self::Item)>::push_param_ty(ctx, body);
+            <B>::push_param_ty(ctx, body);
             let mut params = Vec::new();
             init.to_block_values(&mut params);
             ctx.builder().ins().jump(header, &params);
@@ -64,12 +62,12 @@ pub trait JIterator {
 
         let (has_it, it) = self.next();
 
-        let (acc, it) = with_ctx(|ctx| {
+        let acc = with_ctx(|ctx| {
             let mut then_params = Vec::new();
             let init = B::read_from_ret(&mut ctx.builder().block_params(header).iter().copied());
             let mut params = Vec::new();
             init.to_block_values(&mut params);
-            (init, it).to_block_values(&mut then_params);
+            init.to_block_values(&mut then_params);
             ctx.builder().ins().brif(
                 has_it.value,
                 body,
@@ -79,10 +77,10 @@ pub trait JIterator {
 
             ctx.builder().switch_to_block(body);
             ctx.builder().seal_block(body);
-            <(B, Self::Item)>::read_from_ret(&mut ctx.builder().block_params(body).iter().copied())
+            <B>::read_from_ret(&mut ctx.builder().block_params(body).iter().copied())
         });
 
-        let acc = f(acc, it);
+        let acc = f(acc, it());
 
         with_ctx(|ctx| {
             let mut params = Vec::new();
@@ -110,9 +108,9 @@ where
 {
     type Item = B;
 
-    fn next(&mut self) -> (Val<bool>, Self::Item) {
+    fn next(&mut self) -> (Val<bool>, impl FnOnce() -> Self::Item) {
         let (has_it, val) = self.inner.next();
-        (has_it, (self.f)(val))
+        (has_it, || (self.f)(val()))
     }
 }
 
@@ -144,6 +142,12 @@ impl Step for Var<u64> {
     }
 }
 
+impl Step for Var<i32> {
+    fn step(&mut self) {
+        *self += 1i32;
+    }
+}
+
 impl<Idx> JIterator for RangeJiter<Idx>
 where
     Val<Idx>: Compare,
@@ -151,8 +155,9 @@ where
 {
     type Item = Val<Idx>;
 
-    fn next(&mut self) -> (Val<bool>, Self::Item) {
-        let ret = (self.start.value().neq(self.end), self.start.value());
+    fn next(&mut self) -> (Val<bool>, impl FnOnce() -> Self::Item) {
+        let val = self.start.value();
+        let ret = (self.start.value().neq(self.end), move || val);
         self.start.step();
         ret
     }
@@ -188,23 +193,24 @@ where
 {
     type Item = T::Item;
 
-    fn next(&mut self) -> (Val<bool>, Self::Item) {
+    fn next(&mut self) -> (Val<bool>, impl FnOnce() -> Self::Item) {
         let [header_block, body_block, exit_block] = with_ctx(|ctx| {
             let [header_block, body_block, exit_block] = ctx.create_blocks();
             <(Val<bool>, Self::Item) as BlockRet>::push_param_ty(ctx, exit_block);
-            Self::Item::push_param_ty(ctx, body_block);
+            // Self::Item::push_param_ty(ctx, body_block);
             ctx.builder().ins().jump(header_block, &[]);
             ctx.builder().switch_to_block(header_block);
             [header_block, body_block, exit_block]
         });
-
+        
         let (has_it, it) = self.inner.next();
-
-        let it = with_ctx(|ctx| {
-            let mut then_params = Vec::new();
-            it.to_block_values(&mut then_params);
+        
+        with_ctx(|ctx| {
+            let then_params = Vec::new();
             let mut else_params = Vec::new();
-            (has_it, it).to_block_values(&mut else_params);
+            has_it.to_block_values(&mut else_params);
+            Self::Item::null(ctx, &mut else_params);
+
             ctx.builder().ins().brif(
                 has_it.value(),
                 body_block,
@@ -212,14 +218,14 @@ where
                 exit_block,
                 &else_params
             );
-
+        
             ctx.builder().switch_to_block(body_block);
             ctx.builder().seal_block(body_block);
-            Self::Item::read_from_ret(&mut ctx.builder.block_params(body_block).iter().copied())
         });
-
+        
+        let it = it();
         let take = (self.f)(&it);
-
+        
         with_ctx(|ctx| {
             let mut then_params = Vec::new();
             (has_it, it).to_block_values(&mut then_params);
@@ -230,11 +236,12 @@ where
                 header_block,
                 &[],
             );
-
+        
             ctx.builder().seal_block(header_block);
             ctx.builder().switch_to_block(exit_block);
             ctx.builder().seal_block(exit_block);
-            <_ as BlockRet>::read_from_ret(&mut ctx.builder.block_params(exit_block).iter().copied())
+            let (has_it, it) =  <_ as BlockRet>::read_from_ret(&mut ctx.builder.block_params(exit_block).iter().copied());
+            (has_it, || it)
         })
     }
 }

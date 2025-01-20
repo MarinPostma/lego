@@ -293,22 +293,21 @@ One thing to understand here is that `my_func_native` is effectively a thin wrap
   movq    %rsp, %rbp
   unwind DefineNewFrame { offset_upward_to_caller_sp: 16, offset_downward_to_clobbers: 0 }
 block0:
-  xorq    %r8, %r8, %r8
+  xorq    %rdx, %rdx, %rdx
   xorl    %eax, %eax, %eax
   jmp     label1
 block1:
-  imulq   %r8, 0x4, %r9
-  lea     1(%r8), %rdx
-  movl    0(%rsi,%r9,1), %r9d
-  cmpq    %rdi, %r8
+  cmpq    %rdi, %rdx
   jnz     label3; j label2
 block2:
   movq    %rbp, %rsp
   popq    %rbp
   ret
 block3:
-  lea     1(%rax,%r9,1), %eax
-  movq    %rdx, %r8
+  imulq   %rdx, 0x4, %r10
+  lea     1(%rdx), %rdx
+  movl    0(%rsi,%r10,1), %r10d
+  lea     1(%rax,%r10,1), %eax
   jmp     label1
 ```
 

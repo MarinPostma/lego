@@ -9,7 +9,7 @@ fn main() {
 
     let before = Instant::now();
     let main = ctx.func::<&[i32], i32>(|items| {
-        // let print = (|v: u64| println!("val: {v}")).into_host_fn();
+        let print = (|v: i32| println!("val: {v}")).into_host_fn();
         // it1
         //     .into_jiter()
         //     // .filter(|it| {
@@ -20,18 +20,18 @@ fn main() {
         //         print.call(it.deref());
         //     });
 
-        let sum = items
-            .into_jiter()
-            .map(|it| it.deref() + 1i32)
-            .fold(0i32.value(), |acc, it| {
-                acc + it
-            });
+    let sum = items
+        .into_jiter()
+        .map(|it| it.deref() + 1i32)
+        .fold(0i32.value(), |acc, it| {
+            acc + it
+        });
 
-        sum
+    sum
     });
 
     let main = ctx.get_compiled_function(main);
 
-    let items = &[1, 2, 3, 4];
+    let items = &[2, 2, 2, 1];
     dbg!(main.call(items));
 }

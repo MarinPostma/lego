@@ -14,6 +14,12 @@ pub struct Slice<'a, T> {
     pub _p: PhantomData<&'a [T]>,
 }
 
+impl<T> Clone for Slice<'_, T> {
+    fn clone(&self) -> Self { *self }
+}
+
+impl<T> Copy for Slice<'_, T> { }
+
 impl<'a, T> Slice<'a, T> {
     pub fn len(&self) -> Val<usize> {
         self.len
@@ -61,9 +67,14 @@ pub struct SliceIter<'a, T> {
 impl<'a, T> JIterator for SliceIter<'a, T> {
     type Item = Ref<'a, T>;
 
-    fn next(&mut self) -> (Val<bool>, Self::Item) {
-        let ret = (self.index.value().neq(self.slice.len()), self.slice.get(self.index));
-        self.index += 1usize;
+    fn next(&mut self) -> (Val<bool>, impl FnOnce() -> Self::Item) {
+        let s = self.slice;
+        let index = self.index;
+        let ret = (self.index.value().neq(self.slice.len()), move || {
+            let val = s.get(index);
+            self.index += 1usize;
+            val
+        });
         ret
     }
 }
