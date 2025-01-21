@@ -1,4 +1,4 @@
-# Lego (name in progress)
+# Lego (name in progress) [WIP]
 
 Lego is a library experimenting with multi-stage programming in rust.
 
